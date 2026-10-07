@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Protocolo de comunicação</title>
+  </head>
+  <body>
+    <h1>Protocolo de comunicação</h1>
+
+    <p>
+      Cliente e servidor trocam pacotes de texto sobre TCP. Cada pacote é uma lista de campos separados por
+      <code>cSep</code> e terminada por <code>cFin</code>.
+    </p>
+
+    <div class="callout callout-note">
+      <p>
+        Os caracteres reais de <code>cSep</code> e <code>cFin</code> são definidos na unit <code>VVHeader</code>,
+        que não faz parte dos fontes analisados. Nos exemplos abaixo, <code>|</code> representa <code>cSep</code>
+        e <code>&lt;FIN&gt;</code> representa <code>cFin</code>.
+      </p>
+    </div>
+
+    <h2>Formato do pacote</h2>
+    <pre><code>TAMANHO | INVOKE_ID | FILLER | COMANDO | PARAMETROS... &lt;FIN&gt;</code></pre>
+    <table>
+      <thead>
+        <tr><th>Campo (<code>GetParam</code>)</th><th>Nome</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td>Tamanho</td><td>Comprimento total do pacote em caracteres, incluindo o próprio campo e o <code>cFin</code>, com 7 dígitos e zeros à esquerda.</td></tr>
+        <tr><td>2</td><td>Invoke ID</td><td>Identificador sequencial da requisição, de 1 a 77777 (volta a 1 depois disso). A resposta repete o ID.</td></tr>
+        <tr><td>3</td><td>Filler</td><td>Texto livre definido pela aplicação (propriedade <code>Filler</code>). O servidor o devolve na resposta, o que permite correlacionar respostas em modo assíncrono.</td></tr>
+        <tr><td>4</td><td>Comando</td><td>Código numérico: requisição (<code>RQ_*</code>), evento (<code>EV_*</code>) ou resposta (<code>RP_ACK</code>/<code>RP_NAK</code>).</td></tr>
+        <tr><td>5 em diante</td><td>Parâmetros</td><td>Específicos de cada comando. Por convenção, cada parâmetro é seguido de <code>cSep</code>, inclusive o último.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Cálculo do tamanho</h3>
+    <p>
+      O corpo é montado como <code>InvokeID + cSep + Filler + cSep + Comando + cSep + Parâmetros + cFin</code>. O
+      campo de tamanho vale <code>Length(corpo) + 8</code>: 7 dígitos do próprio campo mais 1 separador. Exemplo
+      com invoke ID 12, filler vazio, comando 2203 e parâmetros <code>2001|1234|</code>:
+    </p>
+    <pre><code>0000028|12||2203|2001|1234|&lt;FIN&gt;</code></pre>
+    <p>São 20 caracteres de corpo (contando o <code>cFin</code>) mais 8 do prefixo: 28.</p>
+
+    <h3>Validação na recepção</h3>
+    <ol>
+      <li>O pacote precisa terminar em <code>cFin</code>.</li>
+      <li>Removido o <code>cFin</code>, o valor do campo 1 menos 1 precisa ser igual ao comprimento restante.</li>
+    </ol>
+    <p>
+      Se qualquer verificação falhar, o pacote é descartado, uma mensagem
+      <code>Warning - Packet Lost (invalid checksum)</code> sai em <code>OnDebugInfo</code> e
+      <code>OnPacketLoss</code> é disparado com o conteúdo bruto. Não há pedido de retransmissão.
+    </p>
+
+    <h2>Requisições</h2>
+    <p>
+      <code>SendRequest(iCommand, sParams)</code> e todos os métodos dos componentes derivados passam por
+      <code>SendCommand</code>, que zera a última resposta, gera um novo invoke ID e envia o pacote. Em modo
+      síncrono o envio vira uma transação (veja <a href="./arquitetura.html">Arquitetura e ciclo de vida</a>).
+    </p>
+    <p>
+      <code>SendEvent(iCommand, sParams)</code> monta o mesmo tipo de pacote, mas nunca abre transação nem zera a
+      última resposta: serve para notificações que não esperam confirmação.
+    </p>
+
+    <h2>Respostas</h2>
+    <p>Uma resposta é um pacote cujo campo 4 é <code>RP_ACK</code> (aceito) ou <code>RP_NAK</code> (recusado):</p>
+    <pre><code>TAMANHO | INVOKE_ID | FILLER | RP_ACK ou RP_NAK | COMANDO_ORIGINAL | RETCODE | DADOS | &lt;FIN&gt;</code></pre>
+    <table>
+      <thead>
+        <tr><th>Campo</th><th>Conteúdo</th><th>Onde aparece no componente</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>3</td><td>Filler da requisição</td><td>Parâmetro <code>sFiller</code> de <code>OnServerResponse</code></td></tr>
+        <tr><td>4</td><td><code>RP_ACK</code> ou <code>RP_NAK</code></td><td>Propriedade <code>Response</code></td></tr>
+        <tr><td>5</td><td>Código do comando respondido</td><td>Parâmetro <code>iCommand</code> de <code>OnServerResponse</code></td></tr>
+        <tr><td>6</td><td>Código de retorno</td><td>Propriedade <code>RetCode</code></td></tr>
+        <tr><td>7</td><td>Dados da resposta</td><td>Propriedade <code>RespData</code>, já passada por <code>DecodeFromProtocol</code></td></tr>
+      </tbody>
+    </table>
+    <p>
+      Ao receber uma resposta, o componente encerra a transação pendente (se houver), grava os três valores e
+      dispara <code>OnServerResponse</code>. Quando <code>RespData</code> carrega vários valores, eles vêm
+      separados por <code>cSep</code> e são lidos com <code>GetParam(RespData, n)</code> — é o que
+      <code>TVVSIPClient</code> faz com a resposta de <code>WaitRing</code>.
+    </p>
+
+    <h3>Respondendo a uma requisição do servidor</h3>
+    <p>
+      Quando é o servidor que pergunta, a aplicação responde com
+      <code>SendResponse(iResponse, iRetCode, sPacket, sData, bEncode)</code>, passando o pacote original em
+      <code>sPacket</code>. O componente reaproveita o invoke ID, o filler e o código de comando do pacote
+      recebido; com <code>bEncode = True</code>, <code>sData</code> passa por <code>EncodeToProtocol</code> antes
+      do envio (necessário quando os dados podem conter os caracteres reservados do protocolo).
+    </p>
+
+    <h2>Eventos do servidor</h2>
+    <p>
+      Qualquer pacote cujo campo 4 não seja <code>RP_ACK</code>/<code>RP_NAK</code> é tratado pelos componentes
+      derivados como evento. As tabelas de eventos e a posição de cada campo estão na referência de
+      <a href="./componentes/tvvcticlient.html">TVVCTIClient</a>,
+      <a href="./componentes/tvvroutingclient.html">TVVRoutingClient</a> e
+      <a href="./componentes/tvvsipclient.html">TVVSIPClient</a>. Todo pacote válido também chega, bruto, em
+      <code>OnPacketRecv</code>.
+    </p>
+
+    <h2>Criptografia</h2>
+    <p>Com <code>Encrypted = True</code>, o pacote completo é embrulhado em um segundo pacote:</p>
+    <pre><code>TAMANHO | EncryptString(pacote original completo) | &lt;FIN&gt;</code></pre>
+    <p>Na recepção:</p>
+    <ol>
+      <li>O envelope externo é validado como qualquer pacote.</li>
+      <li>O campo 2 é decifrado com <code>DecryptString</code>.</li>
+      <li>O pacote interno é validado de novo (terminador e tamanho). Se falhar, dispara <code>OnPacketLoss</code>.</li>
+    </ol>
+    <p>
+      O algoritmo de <code>EncryptString</code>/<code>DecryptString</code> está em <code>VVLib</code> e não foi
+      analisado. A opção vale para o socket de controle inteiro: cliente e servidor precisam estar configurados da
+      mesma forma. O socket de debug não é cifrado.
+    </p>
+
+    <h2>Keep-alive</h2>
+    <p>
+      A base envia periodicamente o comando <code>0</code> sem parâmetros. <code>TVVRoutingClient</code> envia,
+      além disso, o seu próprio <code>RQ_KEEP_ALIVE</code> (2201).
+    </p>
+
+    <h2>Portas padrão</h2>
+    <table>
+      <thead>
+        <tr><th>Componente</th><th>Controle</th><th>Debug</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>TVVClient</code></td><td>7010</td><td>7011</td></tr>
+        <tr><td><code>TVVSIPClient</code></td><td>7050</td><td>7051</td></tr>
+        <tr><td><code>TVVCTIClient</code></td><td>7070</td><td>7071</td></tr>
+        <tr><td><code>TVVRoutingClient</code></td><td>9220</td><td>9221</td></tr>
+      </tbody>
+    </table>
+  </body>
+</html>

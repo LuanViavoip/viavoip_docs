@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>TVVClient</title>
+  </head>
+  <body>
+    <h1>TVVClient</h1>
+
+    <p>
+      Classe base de todos os clientes ViaVOIP. Unit <code>VVClient.pas</code>, descendente de
+      <code>TComponent</code>, registrada na paleta <strong>ViaVOIP Clients</strong>. Pode ser usada diretamente
+      para falar com qualquer servidor que siga o <a href="../protocolo.html">protocolo</a>, enviando comandos
+      genéricos com <code>SendRequest</code>.
+    </p>
+
+    <h2>Propriedades</h2>
+    <table>
+      <thead>
+        <tr><th>Propriedade</th><th>Tipo</th><th>Padrão</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>SHost</code></td><td><code>String</code></td><td>vazio</td><td>Endereço do servidor (usado pelos dois sockets).</td></tr>
+        <tr><td><code>SPort</code></td><td><code>Integer</code></td><td>7010</td><td>Porta do socket de controle.</td></tr>
+        <tr><td><code>DPort</code></td><td><code>Integer</code></td><td>7011</td><td>Porta do socket de debug.</td></tr>
+        <tr><td><code>TimeOut</code></td><td><code>Integer</code></td><td>60000</td><td>Tempo máximo, em ms, de uma transação síncrona e da espera de conexão.</td></tr>
+        <tr><td><code>AutoReconnect</code></td><td><code>Boolean</code></td><td><code>True</code></td><td>Tenta reconectar a cada 15 s quando a conexão falha ou cai.</td></tr>
+        <tr><td><code>SyncMode</code></td><td><code>Boolean</code></td><td><code>False</code></td><td>Liga o modo síncrono. A atribuição é <strong>ignorada</strong> se <code>SetSysApplication</code>/<code>SetSysServiceThread</code> ainda não foi chamado.</td></tr>
+        <tr><td><code>Encrypted</code></td><td><code>Boolean</code></td><td><code>False</code></td><td>Cifra todo o tráfego do socket de controle.</td></tr>
+        <tr><td><code>KeepAlive</code></td><td><code>Boolean</code></td><td><code>True</code></td><td>Envia o comando 0 a cada 20–40 s enquanto conectado. Lida no momento da conexão.</td></tr>
+        <tr><td><code>Filler</code></td><td><code>String</code></td><td>vazio</td><td>Texto livre enviado no campo 3 de cada requisição e devolvido na resposta.</td></tr>
+        <tr><td><code>RespWait</code></td><td><code>Byte</code></td><td>20</td><td>Pausa, em ms, entre as voltas do laço de espera síncrona.</td></tr>
+        <tr><td><code>FilterDebug</code></td><td><code>TStrings</code></td><td>vazio</td><td>Substrings que uma linha de debug do servidor precisa conter para ser entregue em <code>OnServerDInfo</code>.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Somente leitura</h3>
+    <table>
+      <thead>
+        <tr><th>Propriedade</th><th>Tipo</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Active</code></td><td><code>Boolean</code></td><td>O socket de controle está conectado.</td></tr>
+        <tr><td><code>InTrans</code></td><td><code>Boolean</code></td><td>Há uma transação síncrona aguardando resposta.</td></tr>
+        <tr><td><code>TimeOutCount</code></td><td><code>Integer</code></td><td>Quantas transações estouraram o tempo desde a criação do componente.</td></tr>
+        <tr><td><code>Response</code></td><td><code>Integer</code></td><td>Última resposta: <code>RP_ACK</code>, <code>RP_NAK</code> ou 0 (nenhuma desde o último comando).</td></tr>
+        <tr><td><code>RetCode</code></td><td><code>Integer</code></td><td>Código de retorno da última resposta.</td></tr>
+        <tr><td><code>RespData</code></td><td><code>String</code></td><td>Dados da última resposta, já decodificados.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Métodos públicos</h2>
+    <table>
+      <thead>
+        <tr><th>Método</th><th>Retorno</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Start()</code></td><td><code>Boolean</code></td><td>Abre o socket de controle em <code>SHost:SPort</code>. <code>True</code> se ficou conectando ou conectado. Se falhar com <code>AutoReconnect</code> ligado, arma a reconexão.</td></tr>
+        <tr><td><code>Stop()</code></td><td><code>Boolean</code></td><td>Fecha o socket de controle e cancela a reconexão automática.</td></tr>
+        <tr><td><code>StartDebug()</code></td><td><code>Boolean</code></td><td>Abre o socket de debug em <code>SHost:DPort</code>.</td></tr>
+        <tr><td><code>StopDebug()</code></td><td><code>Boolean</code></td><td>Fecha o socket de debug.</td></tr>
+        <tr><td><code>SetSysApplication(appl: TApplication)</code></td><td>—</td><td>Informa a aplicação VCL que bombeará mensagens no modo síncrono.</td></tr>
+        <tr><td><code>SetSysServiceThread(svThread: TServiceThread)</code></td><td>—</td><td>Equivalente para serviços Windows. Se ambos forem informados, a aplicação tem precedência.</td></tr>
+        <tr><td><code>SendRequest(iCommand: Integer; const sParams: String)</code></td><td><code>Boolean</code></td><td>Envia uma requisição usando <code>Filler</code>. Síncrono: <code>True</code> só com <code>RP_ACK</code>. Assíncrono: <code>True</code> se o pacote foi enviado.</td></tr>
+        <tr><td><code>SendEvent(iCommand: Integer; const sParams: String)</code></td><td><code>Boolean</code></td><td>Envia um pacote sem abrir transação e sem zerar a última resposta.</td></tr>
+        <tr><td><code>SendResponse(iResponse, iRetCode: Integer; const sPacket, sData: String; bEncode: Boolean)</code></td><td><code>Boolean</code></td><td>Responde a um pacote recebido (<code>sPacket</code>), reaproveitando invoke ID, filler e comando.</td></tr>
+        <tr><td><code>RQ_MakePacket(iCommand: Integer; const sFiller, sPacket: String)</code></td><td><code>String</code></td><td>Monta (sem enviar) um pacote de requisição com um novo invoke ID.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Eventos</h2>
+    <div class="callout callout-note">
+      <p>
+        Os tipos de evento são declarados em <code>VVHeadType</code>. As assinaturas abaixo foram deduzidas da
+        forma como <code>VVClient.pas</code> os invoca; modificadores como <code>const</code> podem diferir.
+      </p>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Evento</th><th>Parâmetros (além de <code>Sender</code>)</th><th>Quando dispara</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>OnSocketConnect</code></td><td><code>Info: TVVSocketInfoRec</code></td><td>Socket de controle conectou.</td></tr>
+        <tr><td><code>OnSocketDisconnect</code></td><td><code>Info: TVVSocketInfoRec</code></td><td>Socket de controle fechou.</td></tr>
+        <tr><td><code>OnSocketError</code></td><td><code>Info: TVVSocketInfoRec</code></td><td>Falha ao conectar, ou fechamento com código de erro.</td></tr>
+        <tr><td><code>OnPacketRecv</code></td><td><code>Info: TVVSocketInfoRec; sPacket: String</code></td><td>Depois de cada pacote válido (já decifrado e sem o <code>cFin</code>), após o processamento interno.</td></tr>
+        <tr><td><code>OnPacketLoss</code></td><td><code>sPacket: String</code></td><td>Pacote descartado por terminador, tamanho ou decifragem inválidos.</td></tr>
+        <tr><td><code>OnServerResponse</code></td><td><code>iCommand, iResponse, iRetCode: Integer; sData, sFiller: String</code></td><td>Chegou um <code>RP_ACK</code> ou <code>RP_NAK</code>.</td></tr>
+        <tr><td><code>OnTransactionTimeOut</code></td><td>— (<code>TNotifyEvent</code>)</td><td>Uma transação síncrona não foi respondida em <code>TimeOut</code> ms.</td></tr>
+        <tr><td><code>OnDebugInfo</code></td><td><code>sMessage: String</code></td><td>Mensagens de diagnóstico do próprio componente (conexão, pacotes, erros capturados).</td></tr>
+        <tr><td><code>OnServerDInfo</code></td><td><code>sMessage: String</code></td><td>Texto recebido pelo socket de debug, após o <code>FilterDebug</code>.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>TVVSocketInfoRec</h3>
+    <p>Registro preenchido a partir do socket no momento do evento. Campos usados em <code>VVClient.pas</code>:</p>
+    <table>
+      <thead>
+        <tr><th>Campo</th><th>Conteúdo</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>SocketHandle</code></td><td>Handle do socket.</td></tr>
+        <tr><td><code>LocalAddress</code>, <code>LocalPort</code></td><td>Endereço e porta locais (preenchidos apenas com o socket conectado).</td></tr>
+        <tr><td><code>RemoteAddress</code>, <code>RemotePort</code></td><td>Endereço e porta do servidor. Com o socket desconectado, trazem o host e a porta configurados.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Membros protegidos (para componentes derivados)</h2>
+    <table>
+      <thead>
+        <tr><th>Membro</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>SendCommand(iCommand, sParams, sFiller): Boolean</code> <em>virtual</em></td><td>Caminho único de envio de requisições. Recusa se não estiver <code>Active</code>, zera a última resposta e envia como transação (síncrono) ou direto (assíncrono).</td></tr>
+        <tr><td><code>ProcessPacket(Info, sPacket)</code> <em>virtual</em></td><td>Trata <code>RP_ACK</code>/<code>RP_NAK</code>: encerra a transação, grava a resposta e dispara <code>OnServerResponse</code>.</td></tr>
+        <tr><td><code>ProcessConnected(Info)</code>, <code>ProcessDisconnected(Info)</code> <em>virtuais</em></td><td>Ganchos de conexão; na base só registram uma mensagem de debug.</td></tr>
+        <tr><td><code>SendToServer(sPacket): Boolean</code></td><td>Envia um pacote pronto, cifrando se <code>Encrypted</code>. Não abre transação.</td></tr>
+        <tr><td><code>SendTransaction(sPacket): Boolean</code></td><td>Envia e marca a transação; recusa se já houver uma em andamento.</td></tr>
+        <tr><td><code>RP_MakePacket(iInvokeID, iCommand, sFiller, sPacket): String</code></td><td>Monta um pacote com invoke ID explícito (usado em respostas).</td></tr>
+        <tr><td><code>MakeEncryptedPacket(sPacket): String</code></td><td>Embrulha um pacote no envelope cifrado.</td></tr>
+        <tr><td><code>SetResponse(iResponse, iRetCode, sData)</code></td><td>Grava <code>Response</code>, <code>RetCode</code> e <code>RespData</code>.</td></tr>
+        <tr><td><code>WaitTransaction(): Boolean</code>, <code>WaitConnection(iSleep = 20): Boolean</code>, <code>WaitProcess(iSleep)</code></td><td>Laços de espera do modo síncrono.</td></tr>
+        <tr><td><code>FireDebugInfo(sMessage)</code>, <code>FireServerDInfo(sMessage)</code>, <code>FireServerResponse(...)</code></td><td>Disparam os eventos correspondentes.</td></tr>
+        <tr><td><code>TrySend(Socket, sPacket, iMaxError = 3, iWait = 20): Boolean</code></td><td>Envia pelo socket se estiver conectado. Os parâmetros de repetição existem na assinatura mas não são usados.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Tratamento de erros</h2>
+    <p>
+      Nenhum método público propaga exceções: todas são capturadas, descritas em <code>OnDebugInfo</code> e
+      convertidas em retorno <code>False</code>. Para diagnosticar falhas, ligue <code>OnDebugInfo</code>.
+    </p>
+  </body>
+</html>

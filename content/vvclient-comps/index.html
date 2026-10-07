@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>VVClient Comps — Visão geral</title>
+  </head>
+  <body>
+    <h1>VVClient Comps</h1>
+
+    <p>
+      <strong>VVClient Comps</strong> é o conjunto de componentes Delphi (VCL) que os aplicativos da ViaVOIP usam
+      para conversar com os servidores da plataforma. Todos compartilham a mesma base — uma conexão TCP com um
+      protocolo de pacotes textual — e cada componente acrescenta os comandos e eventos de um servidor específico:
+      CTI, roteamento de filas ou canais SIP.
+    </p>
+
+    <div class="callout callout-note">
+      <p>
+        Esta documentação foi escrita a partir da leitura dos quatro arquivos-fonte da pasta
+        <code>VVClient Comps</code>. As units de apoio (<code>VVHeader</code>, <code>VVHeadType</code>,
+        <code>VVLib</code>, <code>VVProtocol</code>, <code>VVChannelClient</code>,
+        <code>VVCCTIMID_ConnectWare</code>) não estavam na pasta; tudo o que depende delas está marcado como
+        <em>definido fora destes fontes</em>. Veja <a href="./pontos-de-atencao.html">Pontos de atenção</a>.
+      </p>
+    </div>
+
+    <h2>Componentes</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Componente</th><th>Unit</th><th>Herda de</th><th>Porta padrão</th><th>Paleta</th><th>Finalidade</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><a href="./componentes/tvvclient.html"><code>TVVClient</code></a></td>
+          <td><code>VVClient.pas</code></td>
+          <td><code>TComponent</code></td>
+          <td>7010 (debug 7011)</td>
+          <td>ViaVOIP Clients</td>
+          <td>Base: sockets, montagem e validação de pacotes, transações, reconexão, keep-alive e canal de debug.</td>
+        </tr>
+        <tr>
+          <td><a href="./componentes/tvvcticlient.html"><code>TVVCTIClient</code></a></td>
+          <td><code>VVCTIClient.pas</code></td>
+          <td><code>TVVClient</code></td>
+          <td>7070 (debug 7071)</td>
+          <td>ViaVOIP Clients</td>
+          <td>Controle de telefonia (CTI): monitoração de ramais, sessão de agente ACD, controle de chamadas e consultas ao PABX.</td>
+        </tr>
+        <tr>
+          <td><a href="./componentes/tvvroutingclient.html"><code>TVVRoutingClient</code></a></td>
+          <td><code>VVRoutingClient.pas</code></td>
+          <td><code>TVVClient</code></td>
+          <td>9220 (debug 9221)</td>
+          <td>ViaVOIP Tools</td>
+          <td>Roteamento: registro da aplicação, estado de agentes e enfileiramento/desenfileiramento de chamadas.</td>
+        </tr>
+        <tr>
+          <td><a href="./componentes/tvvsipclient.html"><code>TVVSIPClient</code></a></td>
+          <td><code>VVSIPClient.pas</code></td>
+          <td><code>TVVChannelClient</code></td>
+          <td>7050 (debug 7051)</td>
+          <td>ViaVOIP Clients</td>
+          <td>Canal SIP: registro, chamadas, transferências, reprodução e gravação de áudio, coleta de DTMF.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Hierarquia</h2>
+    <pre><code>TComponent
+└── TVVClient                 (VVClient.pas)
+    ├── TVVCTIClient          (VVCTIClient.pas)
+    ├── TVVRoutingClient      (VVRoutingClient.pas)
+    └── TVVChannelClient      (VVChannelClient.pas — não incluído na pasta)
+        └── TVVSIPClient      (VVSIPClient.pas)</code></pre>
+
+    <p>
+      <code>TVVSIPClient</code> usa membros de <code>TVVClient</code> (<code>SPort</code>, <code>Filler</code>,
+      <code>SyncMode</code>, <code>RespData</code>, <code>SendToServer</code>…), o que indica que
+      <code>TVVChannelClient</code> descende de <code>TVVClient</code>; o fonte dessa classe intermediária não
+      foi fornecido.
+    </p>
+
+    <h2>Como as peças se encaixam</h2>
+    <ol>
+      <li>A aplicação solta o componente no formulário (ou o cria em código) e informa <code>SHost</code>/<code>SPort</code>.</li>
+      <li><code>Start</code> abre o <strong>socket de controle</strong>; opcionalmente <code>StartDebug</code> abre o <strong>socket de debug</strong> na porta <code>DPort</code>.</li>
+      <li>Cada método público monta uma lista de parâmetros e chama <code>SendCommand</code>, que empacota e envia a requisição.</li>
+      <li>O servidor responde com <code>RP_ACK</code> ou <code>RP_NAK</code>; o resultado fica em <code>Response</code>, <code>RetCode</code> e <code>RespData</code> e é entregue em <code>OnServerResponse</code>.</li>
+      <li>Eventos espontâneos do servidor (mudança de estado de linha, agente reservado, DTMF…) são decodificados em <code>ProcessPacket</code> e disparam os eventos específicos de cada componente.</li>
+    </ol>
+
+    <h2>Conteúdo desta documentação</h2>
+    <ul>
+      <li><a href="./arquitetura.html">Arquitetura e ciclo de vida</a> — sockets, temporizadores, modo síncrono × assíncrono, reconexão.</li>
+      <li><a href="./protocolo.html">Protocolo de comunicação</a> — formato do pacote, validação, criptografia, respostas.</li>
+      <li>Referência de cada componente: <a href="./componentes/tvvclient.html">TVVClient</a>,
+        <a href="./componentes/tvvcticlient.html">TVVCTIClient</a>,
+        <a href="./componentes/tvvroutingclient.html">TVVRoutingClient</a>,
+        <a href="./componentes/tvvsipclient.html">TVVSIPClient</a>.</li>
+      <li><a href="./guia-de-uso.html">Guia de uso</a> — instalação na IDE e roteiros passo a passo.</li>
+      <li><a href="./pontos-de-atencao.html">Pontos de atenção</a> — comportamentos não óbvios, limitações e dependências ausentes.</li>
+    </ul>
+
+    <h2>Arquivos-fonte</h2>
+    <table>
+      <thead>
+        <tr><th>Arquivo</th><th>Linhas</th><th>Última atualização (cabeçalho)</th><th>Codificação</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>VVClient.pas</code></td><td>978</td><td>21.09.2025 — migração para Overbyte ICS</td><td>ISO-8859-1, CRLF</td></tr>
+        <tr><td><code>VVCTIClient.pas</code></td><td>1152</td><td>30.11.2015</td><td>ASCII, CRLF</td></tr>
+        <tr><td><code>VVRoutingClient.pas</code></td><td>579</td><td>11.06.2025</td><td>ASCII, CRLF</td></tr>
+        <tr><td><code>VVSIPClient.pas</code></td><td>847</td><td>13.10.2013</td><td>ASCII, CRLF</td></tr>
+      </tbody>
+    </table>
+    <p>
+      As datas de cabeçalho dos componentes derivados são anteriores à migração da base, mas as assinaturas de
+      <code>ProcessPacket</code>, <code>ProcessConnected</code> e <code>ProcessDisconnected</code> já usam o
+      registro <code>TVVSocketInfoRec</code> introduzido nela — ou seja, foram ajustados sem atualizar a data.
+    </p>
+
+    <h2>Contexto: plataforma Sol-Maker</h2>
+    <p>
+      A pasta inclui o folder comercial do <strong>Sol-Maker</strong>, a plataforma de desenvolvimento integrado da
+      ViaVOIP Solutions. O material descreve soluções modulares (Contact Center, Portal de Voz, Discador
+      Inteligente, Gravador Digital, Gravador de Telas, Sistemas WEB, Integrações e Telemetria), integração com
+      centrais telefônicas legadas (Cisco, Unify/Siemens, Avaya, Panasonic, Intelbras, Alcatel-Lucent, NEC,
+      Ericsson/Aastra) e uma lista de componentes e bibliotecas que inclui SIP e CSTA. Os componentes documentados
+      aqui são o lado cliente dessas integrações de telefonia; o folder não detalha a relação técnica entre eles e
+      os módulos do Sol-Maker.
+    </p>
+  </body>
+</html>
