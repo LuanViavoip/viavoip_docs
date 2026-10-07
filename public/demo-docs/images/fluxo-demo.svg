@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="240" viewBox="0 0 720 240" font-family="ui-sans-serif, system-ui, sans-serif">
+  <rect width="720" height="240" rx="12" fill="#18181b"/>
+  <g fill="#27272a" stroke="#3f3f46">
+    <rect x="40" y="80" width="160" height="80" rx="8"/>
+    <rect x="280" y="80" width="160" height="80" rx="8"/>
+    <rect x="520" y="80" width="160" height="80" rx="8"/>
+  </g>
+  <g fill="#e4e4e7" font-size="16" text-anchor="middle">
+    <text x="120" y="126">Cliente</text>
+    <text x="360" y="126">Gateway Demo</text>
+    <text x="600" y="126">Servi&#231;os Demo</text>
+  </g>
+  <g stroke="#38bdf8" stroke-width="2" fill="none">
+    <path d="M200 120 H272"/>
+    <path d="M440 120 H512"/>
+  </g>
+  <g fill="#38bdf8">
+    <path d="M272 114 L282 120 L272 126 Z"/>
+    <path d="M512 114 L522 120 L512 126 Z"/>
+  </g>
+  <text x="360" y="210" fill="#a1a1aa" font-size="13" text-anchor="middle">DEMONSTRA&#199;&#195;O &#8212; diagrama fict&#237;cio</text>
+</svg>

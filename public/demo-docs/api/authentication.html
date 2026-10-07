@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Autenticação (DEMONSTRAÇÃO)</title>
+  </head>
+  <body>
+    <h1>Autenticação</h1>
+
+    <div class="callout callout-warning">
+      <p><strong>DEMONSTRAÇÃO.</strong> Fluxo de autenticação fictício. Não use estes endpoints.</p>
+    </div>
+
+    <p>
+      As APIs demonstrativas usam um token de acesso enviado no cabeçalho <code>Authorization</code>. Veja os exemplos
+      de requisição e resposta no painel à direita.
+    </p>
+
+    <h2 id="passo-a-passo">Passo a passo</h2>
+    <ol>
+      <li>Solicite um token em <code>POST https://api.example.com/demo/auth/token</code>.</li>
+      <li>Guarde o valor de <code>access_token</code> retornado.</li>
+      <li>Envie <code>Authorization: Bearer &lt;token&gt;</code> nas próximas chamadas.</li>
+    </ol>
+
+    <h2>Códigos de resposta</h2>
+    <table>
+      <thead>
+        <tr><th>Status</th><th>Significado (exemplo)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>200</code></td><td>Token emitido</td></tr>
+        <tr><td><code>401</code></td><td>Credenciais inválidas</td></tr>
+        <tr><td><code>429</code></td><td>Muitas tentativas</td></tr>
+      </tbody>
+    </table>
+
+    <p>Depois de autenticar, consulte a <a href="./clients.html">API de Clientes</a>.</p>
+  </body>
+</html>

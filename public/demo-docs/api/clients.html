@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>API de Clientes (DEMONSTRAÇÃO)</title>
+  </head>
+  <body>
+    <h1>API de Clientes</h1>
+
+    <div class="callout callout-warning">
+      <p><strong>DEMONSTRAÇÃO.</strong> Recursos e campos fictícios, sem relação com o Sol-Maker real.</p>
+    </div>
+
+    <p>
+      A API demonstrativa de clientes permite consultar, criar e atualizar cadastros fictícios. Todas as chamadas
+      exigem <a href="./authentication.html">autenticação</a>.
+    </p>
+
+    <h2>Operações</h2>
+    <ul>
+      <li><a href="./clients/get.html">Consultar cliente</a></li>
+      <li><a href="./clients/create.html">Criar cliente</a></li>
+      <li><a href="./clients/update.html">Atualizar cliente</a></li>
+    </ul>
+
+    <h2>Modelo de dados (exemplo)</h2>
+    <table>
+      <thead>
+        <tr><th>Campo</th><th>Tipo</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>string</td><td>Identificador fictício</td></tr>
+        <tr><td><code>name</code></td><td>string</td><td>Nome do cliente demo</td></tr>
+        <tr><td><code>email</code></td><td>string</td><td>E-mail de exemplo</td></tr>
+        <tr><td><code>active</code></td><td>boolean</td><td>Indica se o cadastro está ativo</td></tr>
+      </tbody>
+    </table>
+
+    <figure>
+      <img src="../images/fluxo-demo.svg" alt="Fluxo demonstrativo (imagem com caminho ../)" width="480" height="160" />
+      <figcaption>Imagem referenciada com <code>../images/fluxo-demo.svg</code>.</figcaption>
+    </figure>
+  </body>
+</html>

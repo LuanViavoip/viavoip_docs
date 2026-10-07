@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Arquitetura (DEMONSTRAÇÃO)</title>
+  </head>
+  <body>
+    <h1>Arquitetura</h1>
+
+    <div class="callout callout-warning">
+      <p><strong>DEMONSTRAÇÃO.</strong> Diagrama e componentes fictícios, criados apenas para testar a renderização.</p>
+    </div>
+
+    <p>O diagrama abaixo é uma imagem referenciada por caminho relativo (<code>./images/fluxo-demo.svg</code>).</p>
+
+    <figure>
+      <img src="./images/fluxo-demo.svg" alt="Fluxo demonstrativo entre cliente, API e serviços" width="720" height="240" />
+      <figcaption>Figura 1 — Fluxo fictício de uma requisição.</figcaption>
+    </figure>
+
+    <h2>Componentes fictícios</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Componente</th>
+          <th>Responsabilidade</th>
+          <th>Tecnologia (exemplo)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Gateway Demo</td>
+          <td>Recebe as requisições externas</td>
+          <td>HTTP</td>
+        </tr>
+        <tr>
+          <td>Serviço de Clientes Demo</td>
+          <td>Operações de cadastro fictícias</td>
+          <td>REST</td>
+        </tr>
+        <tr>
+          <td>Módulo de Voz Demo</td>
+          <td>Sinalização de chamadas de exemplo</td>
+          <td>SIP / WebRTC</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Configuração de exemplo</h2>
+    <pre><code class="language-json">{
+  "environment": "demo",
+  "gateway": { "baseUrl": "https://api.example.com" },
+  "features": ["clients", "users"]
+}</code></pre>
+
+    <p>A sanitização é validada pela suíte automatizada do projeto.</p>
+  </body>
+</html>

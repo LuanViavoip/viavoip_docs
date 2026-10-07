@@ -1,0 +1,87 @@
+// MODELO PROVISÓRIO (Fase 1).
+// Será revisado quando recebermos os índices e HTMLs reais da ViaVOIP/Sol-Maker.
+// Veja docs/ARCHITECTURE.md -> "Partes provisórias".
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model System {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  documents   Document[]
+}
+
+model Document {
+  id                String            @id @default(cuid())
+  systemId          String
+  parentId          String?
+  title             String
+  slug              String
+  type              String?
+  /// Endereço do HTML do documento (caminho local como "/demo-docs/x.html" ou URL http(s)).
+  /// Nós apenas estruturais (ex.: agrupadores do índice) podem não ter conteúdo.
+  contentUrl        String?
+  position          Int               @default(0)
+  metadata          Json?
+  /// Texto puro extraído do HTML sanitizado. Base para a futura busca com PostgreSQL Full Text Search.
+  searchableContent String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  system   System            @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  parent   Document?         @relation("DocumentTree", fields: [systemId, parentId], references: [systemId, id], onDelete: Cascade, map: "Document_parentId_fkey")
+  children Document[]        @relation("DocumentTree")
+  examples Example[]
+  profiles DocumentProfile[]
+
+  // A unicidade das raízes e a rejeição de ciclos são reforçadas por SQL na migration.
+  @@unique([systemId, id])
+  @@unique([systemId, parentId, slug])
+  @@index([systemId, parentId])
+}
+
+model Profile {
+  id        String            @id @default(cuid())
+  name      String
+  slug      String            @unique
+  position  Int               @default(0)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  documents DocumentProfile[]
+}
+
+model DocumentProfile {
+  documentId String
+  profileId  String
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  profile  Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, profileId])
+  @@index([profileId])
+}
+
+model Example {
+  id         String   @id @default(cuid())
+  documentId String
+  /// Tipo do item do painel lateral. Hoje apenas "code"; outros tipos poderão ser adicionados.
+  kind       String   @default("code")
+  title      String
+  language   String?
+  content    String
+  position   Int      @default(0)
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
