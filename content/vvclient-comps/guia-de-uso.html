@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Guia de uso</title>
+  </head>
+  <body>
+    <h1>Guia de uso</h1>
+
+    <div class="callout callout-note">
+      <p>
+        Os endereços, ramais e identificadores dos exemplos são ilustrativos. Os exemplos não foram compilados:
+        as units de apoio necessárias não estavam disponíveis.
+      </p>
+    </div>
+
+    <h2>Instalação na IDE</h2>
+    <ol>
+      <li>Instale o <strong>Overbyte ICS</strong> no Delphi (a base usa <code>OverbyteIcsWSocket</code> e <code>OverbyteIcsWndControl</code>).</li>
+      <li>Tenha no <em>library path</em> as units <code>VVHeader</code>, <code>VVHeadType</code>, <code>VVLib</code>, <code>VVProtocol</code>, <code>VVChannelClient</code> e <code>VVCCTIMID_ConnectWare</code>, além dos arquivos <code>.res</code> de cada componente.</li>
+      <li>Adicione as quatro units a um pacote de design e instale-o. Cada unit tem seu procedimento <code>Register</code>.</li>
+      <li>Os componentes aparecem nas paletas <strong>ViaVOIP Clients</strong> (<code>TVVClient</code>, <code>TVVCTIClient</code>, <code>TVVSIPClient</code>) e <strong>ViaVOIP Tools</strong> (<code>TVVRoutingClient</code>).</li>
+    </ol>
+
+    <h2>Roteiro mínimo</h2>
+    <ol>
+      <li>Informe <code>SHost</code> e, se o servidor não usar a porta padrão, <code>SPort</code>/<code>DPort</code>.</li>
+      <li>Escolha o modo: assíncrono (padrão) ou síncrono.</li>
+      <li>Ligue os eventos que interessam — no mínimo <code>OnDebugInfo</code> durante o desenvolvimento.</li>
+      <li>Chame <code>Start</code>.</li>
+      <li>Envie comandos depois de <code>OnSocketConnect</code> (ou, em modo síncrono, logo após <code>Start</code> devolver <code>True</code> com <code>Active = True</code>).</li>
+      <li>Chame <code>Stop</code> ao encerrar. Destruir o componente também fecha as conexões.</li>
+    </ol>
+
+    <h2>Escolhendo o modo</h2>
+    <table>
+      <thead>
+        <tr><th>Use</th><th>Quando</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Assíncrono</td><td>Aplicações orientadas a eventos (barras de agente, monitores), em que várias requisições podem estar pendentes e a resposta é tratada em <code>OnServerResponse</code>.</td></tr>
+        <tr><td>Síncrono</td><td>Fluxos sequenciais (URA, scripts de atendimento) em que cada passo depende do resultado do anterior. Obrigatório, na prática, para <code>TVVSIPClient</code>.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Ativando o modo síncrono</h3>
+    <pre><code class="language-pascal">// Aplicação VCL
+VVClient1.SetSysApplication(Application);
+VVClient1.SyncMode := True;
+
+// Serviço Windows (dentro do TService)
+VVClient1.SetSysServiceThread(ServiceThread);
+VVClient1.SyncMode := True;</code></pre>
+    <div class="callout callout-warning">
+      <p>
+        A ordem importa. <code>SyncMode := True</code> é silenciosamente ignorado se nenhuma das duas chamadas
+        tiver sido feita antes — inclusive quando o valor vem do <code>.dfm</code>, que é carregado antes do seu
+        código. Defina <code>SyncMode</code> em código e confira o valor da propriedade em seguida.
+      </p>
+    </div>
+
+    <h2>Enviando comandos genéricos</h2>
+    <p>
+      Com <code>TVVClient</code> puro, os parâmetros são montados à mão, cada um seguido de <code>cSep</code>:
+    </p>
+    <pre><code class="language-pascal">sParams := sRamal + cSep + sNumero + cSep;
+
+if VVClient1.SendRequest(iCommand, sParams) then
+  ShowMessage('Resposta: ' + VVClient1.RespData)
+else
+  ShowMessage(Format('Falhou (%d / %d)', [VVClient1.Response, VVClient1.RetCode]));</code></pre>
+
+    <h3>Interpretando um retorno False (modo síncrono)</h3>
+    <table>
+      <thead>
+        <tr><th><code>Response</code></th><th>Situação provável</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>RP_NAK</code></td><td>O servidor recusou; veja <code>RetCode</code> e <code>RespData</code>.</td></tr>
+        <tr><td>0, e <code>OnTransactionTimeOut</code> disparou</td><td>O servidor não respondeu em <code>TimeOut</code> ms.</td></tr>
+        <tr><td>0, sem timeout</td><td>Nada foi enviado: socket desconectado (<code>Active = False</code>), outra transação em andamento (<code>InTrans = True</code>) ou validação local do método.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Correlacionando respostas em modo assíncrono</h2>
+    <p>
+      Defina <code>Filler</code> antes de cada comando; o servidor devolve o mesmo texto no parâmetro
+      <code>sFiller</code> de <code>OnServerResponse</code>, junto com o código do comando respondido.
+    </p>
+    <pre><code class="language-pascal">VVCTIClient1.Filler := 'tela-atendimento';
+VVCTIClient1.CallQuery('2001');
+
+procedure TFormMain.VVCTIClient1ServerResponse(Sender: TObject;
+  iCommand, iResponse, iRetCode: Integer; const sData, sFiller: String);
+begin
+  if (iCommand = RQ_CTI_CALLQUERY) and (sFiller = 'tela-atendimento') then
+    AtualizarChamadas(sData);
+end;</code></pre>
+
+    <h2>Acompanhando a conexão</h2>
+    <pre><code class="language-pascal">procedure TFormMain.VVClient1SocketConnect(Sender: TObject;
+  const Info: TVVSocketInfoRec);
+begin
+  StatusBar1.SimpleText := Format('Conectado a %s:%d',
+    [Info.RemoteAddress, Info.RemotePort]);
+end;
+
+procedure TFormMain.VVClient1SocketDisconnect(Sender: TObject;
+  const Info: TVVSocketInfoRec);
+begin
+  StatusBar1.SimpleText := 'Desconectado';
+  // Com AutoReconnect = True, uma nova tentativa ocorre em 15 s.
+end;</code></pre>
+
+    <h2>Lendo o log do servidor</h2>
+    <pre><code class="language-pascal">VVClient1.FilterDebug.Clear;
+VVClient1.FilterDebug.Add('ERROR');   // só linhas que contenham um dos filtros
+VVClient1.FilterDebug.Add('2001');
+VVClient1.StartDebug;
+
+procedure TFormMain.VVClient1ServerDInfo(Sender: TObject; const sMessage: String);
+begin
+  MemoLog.Lines.Add(sMessage);
+end;</code></pre>
+    <p>O socket de debug não reconecta sozinho: chame <code>StartDebug</code> de novo depois de uma queda.</p>
+
+    <h2>Roteiro: barra de agente com CTI</h2>
+    <ol>
+      <li><code>Start</code> e aguarde <code>OnSocketConnect</code>.</li>
+      <li><code>UseCTI(tipo, host, porta, adaptador)</code> e aguarde <code>OnLinkUp</code>.</li>
+      <li><code>SetDefExt(ramal)</code> e <code>MonitorStart(tipo, ramal)</code>.</li>
+      <li><code>ACDLogon(agente, ramal)</code>, depois <code>ACDAvail(agente)</code>.</li>
+      <li>Trate <code>OnLineEvent</code> para acompanhar as chamadas e guardar o <code>sCallID</code>.</li>
+      <li>Use os métodos <code>Call…</code> com o ramal e o <code>sCallID</code>.</li>
+      <li>Em <code>OnLinkDown</code>, desabilite a interface; ao voltar (<code>OnLinkUp</code>), refaça a monitoração com <code>ReMonitor</code>.</li>
+      <li>No encerramento: <code>ACDLogoff</code>, <code>MonitorStop</code>, <code>Stop</code>.</li>
+    </ol>
+
+    <h2>Roteiro: aplicação de roteamento</h2>
+    <ol>
+      <li>Defina <code>AppType</code> e <code>RegID</code>; mantenha <code>AutoRegister = True</code>.</li>
+      <li><code>Start</code>. O registro é enviado sozinho ao conectar.</li>
+      <li>Aguarde <code>OnRegistered</code> antes de chamar qualquer outro método.</li>
+      <li><code>AgentLogon</code> / <code>AgentAvail</code> para os agentes; <code>EnqueueCall</code> / <code>DequeueCall</code> para as chamadas.</li>
+      <li>Trate <code>OnAgentReserved</code> e <code>OnAgentReleased</code> para saber qual agente recebeu a chamada.</li>
+      <li>Depois de uma queda, o registro é refeito automaticamente — mas os logons de agente precisam ser reenviados pela aplicação em <code>OnRegistered</code>.</li>
+    </ol>
+
+    <h2>Roteiro: atendimento automático com SIP</h2>
+    <pre><code class="language-pascal">// Modo síncrono já ativado; canal aberto com OpenChannel.
+while not Terminated do
+begin
+  if not VVSIPClient1.WaitRing(30000) then Continue;
+  if VVSIPClient1.CallID = '' then Continue;      // ninguém ligou
+
+  VVSIPClient1.SetFlushOnDTMF(True);              // DTMF interrompe o áudio
+  VVSIPClient1.ClearDigits;
+  VVSIPClient1.PlayFiles('menu.wav');
+  VVSIPClient1.GetDigits(1, 8000, sOpcao);
+
+  if sOpcao = '1' then
+    VVSIPClient1.BlindTransfer('2050')
+  else
+  begin
+    VVSIPClient1.PlayFiles('opcao-invalida.wav');
+    VVSIPClient1.ClearCall;
+  end;
+end;</code></pre>
+    <p>
+      Depois de uma transferência ou de o chamador desligar, chame <code>IsEstablished</code> (ou um novo
+      <code>WaitRing</code>, que já faz isso) para o componente atualizar <code>CallID</code>.
+    </p>
+
+    <h2>Criando um novo cliente</h2>
+    <p>Para falar com outro servidor da plataforma, derive de <code>TVVClient</code>:</p>
+    <pre><code class="language-pascal">type
+  TVVMeuClient = class(TVVClient)
+  protected
+    procedure ProcessPacket(const Info: TVVSocketInfoRec;
+      const sPacket: String); override;
+  public
+    constructor Create(AOwner: TComponent); override;
+    function FazerAlgo(const sAlvo: String): Boolean;
+  end;
+
+constructor TVVMeuClient.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  SPort := 7090;          // porta padrão do seu servidor
+  DPort := SPort + 1;
+end;
+
+function TVVMeuClient.FazerAlgo(const sAlvo: String): Boolean;
+begin
+  Result := SendCommand(RQ_MEU_COMANDO, sAlvo + cSep, Filler);
+end;
+
+procedure TVVMeuClient.ProcessPacket(const Info: TVVSocketInfoRec;
+  const sPacket: String);
+begin
+  inherited ProcessPacket(Info, sPacket);     // trata RP_ACK / RP_NAK
+  if GetParamInt(sPacket, 4) = EV_MEU_EVENTO then
+    // campos do evento a partir de GetParam(sPacket, 5)
+end;</code></pre>
+  </body>
+</html>

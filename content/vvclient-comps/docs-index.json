@@ -1,0 +1,97 @@
+{
+  "system": {
+    "name": "VVClient Comps",
+    "description": "Componentes Delphi cliente da ViaVOIP (TVVClient, TVVCTIClient, TVVRoutingClient, TVVSIPClient): conexão TCP, protocolo de pacotes, CTI, roteamento de filas e canais SIP."
+  },
+  "documents": [
+    { "title": "Visão geral", "slug": "visao-geral", "type": "page", "file": "index.html" },
+    { "title": "Arquitetura e ciclo de vida", "slug": "arquitetura", "type": "page", "file": "arquitetura.html" },
+    { "title": "Protocolo de comunicação", "slug": "protocolo", "type": "page", "file": "protocolo.html" },
+    {
+      "title": "Componentes",
+      "slug": "componentes",
+      "type": "module",
+      "children": [
+        {
+          "title": "TVVClient",
+          "slug": "tvvclient",
+          "type": "library",
+          "file": "componentes/tvvclient.html",
+          "examples": [
+            {
+              "title": "Conexão em modo síncrono",
+              "language": "pascal",
+              "content": "procedure TFormMain.FormCreate(Sender: TObject);\nbegin\n  // Obrigatório ANTES de ligar o SyncMode; sem isso a atribuição é ignorada.\n  VVClient1.SetSysApplication(Application);\n  VVClient1.SyncMode := True;\n\n  VVClient1.SHost := '10.0.0.10'; // endereço ilustrativo\n  VVClient1.SPort := 7010;\n  VVClient1.AutoReconnect := True;\n\n  if not VVClient1.Start then\n    ShowMessage('Não foi possível iniciar a conexão');\nend;"
+            },
+            {
+              "title": "Requisição síncrona",
+              "language": "pascal",
+              "content": "// iCommand e o formato dos parâmetros são definidos pelo servidor (VVProtocol).\n// Cada parâmetro termina com cSep (VVHeader).\nif VVClient1.SendRequest(iCommand, sParam1 + cSep + sParam2 + cSep) then\n  // RP_ACK recebido\n  Memo1.Lines.Add('OK: ' + VVClient1.RespData)\nelse\n  // RP_NAK, timeout, transação em andamento ou socket desconectado\n  Memo1.Lines.Add(Format('Falha: resposta=%d retcode=%d',\n    [VVClient1.Response, VVClient1.RetCode]));"
+            },
+            {
+              "title": "Resposta em modo assíncrono",
+              "language": "pascal",
+              "content": "// Assinatura inferida das chamadas em VVClient.pas (o tipo TServerResponse fica em VVHeadType).\nprocedure TFormMain.VVClient1ServerResponse(Sender: TObject;\n  iCommand, iResponse, iRetCode: Integer; const sData, sFiller: String);\nbegin\n  if iResponse = RP_ACK then\n    Memo1.Lines.Add(Format('Comando %d OK: %s', [iCommand, sData]))\n  else\n    Memo1.Lines.Add(Format('Comando %d recusado (retcode %d)', [iCommand, iRetCode]));\nend;"
+            }
+          ]
+        },
+        {
+          "title": "TVVCTIClient",
+          "slug": "tvvcticlient",
+          "type": "library",
+          "file": "componentes/tvvcticlient.html",
+          "examples": [
+            {
+              "title": "Ligar ao CTI e monitorar um ramal",
+              "language": "pascal",
+              "content": "// ctType e mtType são valores de TVVCTIConnType / TMonitorType (VVHeadType).\nif VVCTIClient1.UseCTI(ctType, '10.0.0.20', 7001, 0) then\nbegin\n  VVCTIClient1.SetDefExt('2001');\n  VVCTIClient1.MonitorStart(mtType, '2001');\nend;"
+            },
+            {
+              "title": "Sessão de agente e chamada",
+              "language": "pascal",
+              "content": "VVCTIClient1.ACDLogon('1234', '2001');\nVVCTIClient1.ACDAvail('1234');\n\nVVCTIClient1.CallMake('2001', '01133015432');\n// ... o CallID chega em OnLineEvent ...\nVVCTIClient1.CallHold('2001', sCallID);\nVVCTIClient1.CallRetrieve('2001', sCallID);\nVVCTIClient1.CallDisconnect('2001', sCallID);\n\nVVCTIClient1.ACDUnavail('1234', '1');\nVVCTIClient1.ACDLogoff('1234');"
+            }
+          ]
+        },
+        {
+          "title": "TVVRoutingClient",
+          "slug": "tvvroutingclient",
+          "type": "library",
+          "file": "componentes/tvvroutingclient.html",
+          "examples": [
+            {
+              "title": "Registro automático da aplicação",
+              "language": "pascal",
+              "content": "VVRoutingClient1.SetSysApplication(Application);\nVVRoutingClient1.SHost := '10.0.0.10';\nVVRoutingClient1.AppType := appSMA;\nVVRoutingClient1.RegID := 'APP-01';   // sem RegID o registro não é enviado\nVVRoutingClient1.AutoRegister := True; // registra ao conectar e repete a cada 5 s após NAK\nVVRoutingClient1.Start;"
+            },
+            {
+              "title": "Agente e fila",
+              "language": "pascal",
+              "content": "procedure TFormMain.VVRoutingClient1Registered(Sender: TObject);\nbegin\n  // Só a partir daqui os demais métodos são aceitos (IsRegistered = True).\n  VVRoutingClient1.AgentLogon('2001', '1234');\n  VVRoutingClient1.AgentAvail('2001');\nend;\n\nprocedure TFormMain.VVRoutingClient1AgentReserved(Sender: TObject;\n  const sExtNum, sAgtID: String);\nbegin\n  Memo1.Lines.Add('Agente ' + sAgtID + ' reservado no ramal ' + sExtNum);\nend;"
+            }
+          ]
+        },
+        {
+          "title": "TVVSIPClient",
+          "slug": "tvvsipclient",
+          "type": "library",
+          "file": "componentes/tvvsipclient.html",
+          "examples": [
+            {
+              "title": "Abrir canal e atender (modo síncrono)",
+              "language": "pascal",
+              "content": "VVSIPClient1.SetSysApplication(Application);\nVVSIPClient1.SyncMode := True;\nVVSIPClient1.ChnNumber := 1;\nVVSIPClient1.TransportIP := '10.0.0.30';\nVVSIPClient1.UserAgent := '2001';\nVVSIPClient1.Domain := 'pbx.example.com';\nVVSIPClient1.UserPsw := sSenha;\n\nif VVSIPClient1.Start and VVSIPClient1.OpenChannel then\n  if VVSIPClient1.WaitRing(30000) and (VVSIPClient1.CallID <> '') then\n  begin\n    Memo1.Lines.Add('Chamada de ' + VVSIPClient1.ANI + ' para ' + VVSIPClient1.DNIS);\n    VVSIPClient1.PlayFiles('saudacao.wav');\n  end;"
+            },
+            {
+              "title": "Coletar dígitos e transferir",
+              "language": "pascal",
+              "content": "var\n  sDigits: String;\nbegin\n  VVSIPClient1.ClearDigits;\n  // até 4 dígitos, esperando no máximo 5 s por dígito\n  VVSIPClient1.GetDigits(4, 5000, sDigits);\n\n  if sDigits = '9' then\n    VVSIPClient1.BlindTransfer('2050')\n  else\n    VVSIPClient1.ClearCall;\nend;"
+            }
+          ]
+        }
+      ]
+    },
+    { "title": "Guia de uso", "slug": "guia-de-uso", "type": "page", "file": "guia-de-uso.html" },
+    { "title": "Pontos de atenção", "slug": "pontos-de-atencao", "type": "page", "file": "pontos-de-atencao.html" }
+  ]
+}

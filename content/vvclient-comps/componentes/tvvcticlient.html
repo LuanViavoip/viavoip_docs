@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>TVVCTIClient</title>
+  </head>
+  <body>
+    <h1>TVVCTIClient</h1>
+
+    <p>
+      Cliente do servidor CTI (integração computador–telefonia). Unit <code>VVCTIClient.pas</code>, descendente de
+      <a href="./tvvclient.html"><code>TVVClient</code></a>, paleta <strong>ViaVOIP Clients</strong>, porta padrão
+      <strong>7070</strong> (debug 7071). Herda todas as propriedades, métodos e eventos da base.
+    </p>
+
+    <div class="callout callout-note">
+      <p>
+        Cada método apenas monta os parâmetros e envia um comando <code>RQ_CTI_*</code>; o efeito no PABX e o
+        conteúdo de <code>RespData</code> são definidos pelo servidor CTI e por <code>VVProtocol</code>, fora
+        destes fontes. As descrições abaixo refletem o nome do comando e os parâmetros enviados. Todos os métodos
+        devolvem <code>Boolean</code> com a semântica de <code>SendCommand</code> (veja
+        <a href="../arquitetura.html">modo síncrono × assíncrono</a>).
+      </p>
+    </div>
+
+    <h2>Propriedade</h2>
+    <table>
+      <thead>
+        <tr><th>Propriedade</th><th>Tipo</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>CTIType</code></td><td><code>Integer</code> (somente leitura)</td><td>Ordinal do tipo de conexão informado no último <code>UseCTI</code> bem-sucedido; <code>cNotFound</code> antes disso.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Conexão ao CTI e monitoração</h2>
+    <table>
+      <thead>
+        <tr><th>Método</th><th>Comando</th><th>Parâmetros enviados</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>UseCTI(ctType: TVVCTIConnType; const sHost: String; iPort, iAdapterIdx: Integer)</code></td><td><code>RQ_CTI_USECTI</code></td><td>tipo, host, porta, adaptador</td><td>Pede ao servidor que se ligue ao link CTI do PABX. Recusa localmente se <code>iPort &lt;= 0</code> ou <code>iAdapterIdx &lt; 0</code>. Em caso de sucesso grava <code>CTIType</code>.</td></tr>
+        <tr><td><code>IsLinkUp()</code></td><td><code>RQ_CTI_ISLINKUP</code></td><td>—</td><td>Consulta se o link CTI está ativo.</td></tr>
+        <tr><td><code>MonitorStart(mtType: TMonitorType; const sDevice: String)</code></td><td><code>RQ_CTI_MONITORSTART</code></td><td>tipo de monitor, dispositivo</td><td>Começa a receber eventos do dispositivo.</td></tr>
+        <tr><td><code>MonitorStop(mtType: TMonitorType; const sDevice: String)</code></td><td><code>RQ_CTI_MONITORSTOP</code></td><td>tipo de monitor, dispositivo</td><td>Encerra a monitoração.</td></tr>
+        <tr><td><code>ReMonitor(mtType: TMonitorType; const sDevice: String)</code></td><td><code>RQ_CTI_REMONITOR</code></td><td>tipo de monitor, dispositivo</td><td>Refaz a monitoração de um dispositivo.</td></tr>
+        <tr><td><code>SetDefExt(const sExtension: String)</code></td><td>— (local)</td><td>—</td><td>Guarda o ramal padrão. Não envia nada; é usado pelos comandos ACD quando <code>CTIType = 7</code>.</td></tr>
+        <tr><td><code>SetDefContext(const sContext: String)</code></td><td><code>RQ_CTI_SETCONTEXT</code></td><td>contexto</td><td>Guarda o contexto e o envia imediatamente ao servidor. É um procedimento: não devolve resultado.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Agente ACD</h2>
+    <table>
+      <thead>
+        <tr><th>Método</th><th>Comando</th><th>Parâmetros enviados</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>ACDLogon(const sAgentID, sExtension: String)</code></td><td><code>RQ_CTI_ACDLOGON</code></td><td>agente, ramal</td><td>Loga o agente no ramal.</td></tr>
+        <tr><td><code>ACDLogoff(const sAgentID: String)</code></td><td><code>RQ_CTI_ACDLOGOFF</code></td><td>agente</td><td>Desloga o agente.</td></tr>
+        <tr><td><code>ACDAvail(const sAgentID: String)</code></td><td><code>RQ_CTI_ACDAVAIL</code></td><td>agente</td><td>Coloca o agente como disponível.</td></tr>
+        <tr><td><code>ACDUnavail(const sAgentID, sReason: String)</code></td><td><code>RQ_CTI_ACDUNAVAIL</code></td><td>agente, motivo</td><td>Coloca o agente em pausa, com motivo.</td></tr>
+        <tr><td><code>ACDWork(const sAgentID, sReason: String)</code></td><td><code>RQ_CTI_ACDWORK</code></td><td>agente, motivo</td><td>Coloca o agente em pós-atendimento.</td></tr>
+        <tr><td><code>ACDQuery(const sAgentID: String)</code></td><td><code>RQ_CTI_ACDQUERY</code></td><td>agente</td><td>Consulta o estado ACD do agente.</td></tr>
+        <tr><td><code>AgentQuery(const sExtension, sQueue: String)</code></td><td><code>RQ_CTI_AGENTQUERY</code></td><td>ramal, fila</td><td>Consulta o estado do ramal em uma fila.</td></tr>
+        <tr><td><code>QueueLogon(const sExtension, sQueue: String)</code></td><td><code>RQ_CTI_QUEUELOGON</code></td><td>ramal, fila</td><td>Inclui o ramal na fila.</td></tr>
+        <tr><td><code>QueueLogoff(const sExtension, sQueue: String)</code></td><td><code>RQ_CTI_QUEUELOGOFF</code></td><td>ramal, fila</td><td>Retira o ramal da fila.</td></tr>
+      </tbody>
+    </table>
+    <div class="callout callout-warning">
+      <p>
+        Quando <code>CTIType = 7</code>, os métodos <code>ACDLogoff</code>, <code>ACDAvail</code>,
+        <code>ACDUnavail</code> e <code>ACDWork</code> enviam o ramal padrão (<code>SetDefExt</code>) como
+        primeiro parâmetro, antes do agente. Nesse tipo de CTI, chame <code>SetDefExt</code> antes de usá-los. O
+        nome do tipo 7 está no enumerado <code>TVVCTIConnType</code>, fora destes fontes.
+      </p>
+    </div>
+
+    <h2>Controle de chamadas</h2>
+    <table>
+      <thead>
+        <tr><th>Método</th><th>Comando</th><th>Parâmetros enviados</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>CallMake(const sExtension, sNumber: String)</code></td><td><code>RQ_CTI_CALLMAKE</code></td><td>ramal, número</td><td>Origina uma chamada do ramal.</td></tr>
+        <tr><td><code>CallMakePredictive(iRCGID: Integer; const sNumber: String)</code></td><td><code>RQ_CTI_CALLMAKEPREDICTIVE</code></td><td>grupo, número</td><td>Origina uma chamada preditiva a partir de um grupo.</td></tr>
+        <tr><td><code>CallAnswer(const sExtension, sCallID: String)</code></td><td><code>RQ_CTI_CALLANSWER</code></td><td>ramal, chamada</td><td>Atende.</td></tr>
+        <tr><td><code>CallDisconnect(const sExtension, sCallID: String)</code></td><td><code>RQ_CTI_CALLDISCONNECT</code></td><td>ramal, chamada</td><td>Desliga.</td></tr>
+        <tr><td><code>CallHold(const sExtension, sCallID: String)</code></td><td><code>RQ_CTI_CALLHOLD</code></td><td>ramal, chamada</td><td>Coloca em espera.</td></tr>
+        <tr><td><code>CallRetrieve(const sExtension, sCallID: String)</code></td><td><code>RQ_CTI_CALLRETRIEVE</code></td><td>ramal, chamada</td><td>Recupera da espera.</td></tr>
+        <tr><td><code>CallConsult(const sExtension, sDestination, sCallID: String)</code></td><td><code>RQ_CTI_CALLCONSULT</code></td><td>ramal, destino, chamada</td><td>Abre uma consulta a outro destino.</td></tr>
+        <tr><td><code>CallReconnect(const sExtension, sCallID: String)</code></td><td><code>RQ_CTI_CALLRECONNECT</code></td><td>ramal, chamada</td><td>Encerra a consulta e volta à chamada original.</td></tr>
+        <tr><td><code>CallAlternate(const sExtension, sCallIDA, sCallIDB: String)</code></td><td><code>RQ_CTI_CALLALTERNATE</code></td><td>ramal, chamada A, chamada B</td><td>Alterna entre duas chamadas.</td></tr>
+        <tr><td><code>CallTransfer(const sExtension, sCallIDA, sCallIDB: String)</code></td><td><code>RQ_CTI_CALLTRANSFER</code></td><td>ramal, chamada A, chamada B</td><td>Completa a transferência entre as duas chamadas.</td></tr>
+        <tr><td><code>CallSingleStepTransfer(const sExtension, sDestination, sCallID: String)</code></td><td><code>RQ_CTI_SINGLESTEPTRANSFER</code></td><td>ramal, destino, chamada</td><td>Transferência direta, sem consulta.</td></tr>
+        <tr><td><code>CallConference(const sExtension, sCallIDA, sCallIDB: String)</code></td><td><code>RQ_CTI_CALLCONFERENCE</code></td><td>ramal, chamada A, chamada B</td><td>Une as duas chamadas em conferência.</td></tr>
+        <tr><td><code>CallDeflect(const sCallID: String; iRCGID: Integer; const sDestination, sAttachData: String)</code></td><td><code>RQ_CTI_CALLDEFLECT</code></td><td>chamada, grupo, destino, dados anexos</td><td>Desvia uma chamada de um grupo para outro destino.</td></tr>
+        <tr><td><code>CallDeflectExt(const sExtension, sCallID, sDestination: String)</code></td><td><code>RQ_CTI_CALLDEFLECTEXT</code></td><td>ramal, chamada, destino</td><td>Desvia uma chamada que está em um ramal.</td></tr>
+        <tr><td><code>CallDeflectACD(iID: Word; const sCallID, sDestination: String)</code></td><td><code>RQ_CTI_CALLDEFLECTACD</code></td><td>grupo ACD, chamada, destino</td><td>Desvia uma chamada que está em um grupo ACD.</td></tr>
+        <tr><td><code>CallPark(const sExtension, sCallID: String; iParkID: Word)</code></td><td><code>RQ_CTI_CALLPARK</code></td><td>ramal, chamada, posição</td><td>Estaciona a chamada. Posições acima de 99 são trocadas por 0.</td></tr>
+        <tr><td><code>CallInfo(const sCallID, sExtension: String)</code></td><td><code>RQ_CTI_CALLINFO</code></td><td>chamada, ramal</td><td>Consulta os dados de uma chamada. Atenção à ordem: aqui a chamada vem antes do ramal.</td></tr>
+        <tr><td><code>CallQuery(const sExtension: String)</code></td><td><code>RQ_CTI_CALLQUERY</code></td><td>ramal</td><td>Consulta as chamadas de um ramal.</td></tr>
+        <tr><td><code>GenerateToneExt(const sCallID, sExtension: String; iTone: Word)</code></td><td><code>RQ_CTI_GENERATETONEEXT</code></td><td>chamada, ramal, tom</td><td>Gera um tom na chamada de um ramal.</td></tr>
+        <tr><td><code>GenerateToneTrk(const sCallID: String; iID, iTone: Word)</code></td><td><code>RQ_CTI_GENERATETONETRK</code></td><td>chamada, tronco, tom</td><td>Gera um tom na chamada de um tronco.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Dados anexos à chamada</h2>
+    <table>
+      <thead>
+        <tr><th>Método</th><th>Comando</th><th>Parâmetros enviados</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>AttachDataSet(const sCallID, sData, sAdd: String)</code></td><td><code>RQ_CTI_ATTACHDATASET</code></td><td>chamada, dados, indicador de acréscimo</td><td>Grava dados associados à chamada.</td></tr>
+        <tr><td><code>AttachDataGet(const sCallID: String)</code></td><td><code>RQ_CTI_ATTACHDATAGET</code></td><td>chamada</td><td>Lê os dados associados à chamada.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Troncos e grupos</h2>
+    <table>
+      <thead>
+        <tr><th>Método</th><th>Comando</th><th>Parâmetros enviados</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>TrunkQuery(iTrunkID: Integer)</code></td><td><code>RQ_CTI_TRUNKQUERY</code></td><td>tronco</td></tr>
+        <tr><td><code>TrunkInfo(iTrunkID: Integer; const sCallID: String)</code></td><td><code>RQ_CTI_TRUNKINFO</code></td><td>tronco, chamada</td></tr>
+        <tr><td><code>GroupQuery(iRCGID: Integer)</code></td><td><code>RQ_CTI_GROUPQUERY</code></td><td>grupo</td></tr>
+        <tr><td><code>GroupInfo(iRCGID: Integer; const sCallID: String)</code></td><td><code>RQ_CTI_GROUPINFO</code></td><td>grupo, chamada</td></tr>
+        <tr><td><code>EnableACDMode(iID: Word)</code></td><td><code>RQ_CTI_ENABLEACDMODE</code></td><td>grupo</td></tr>
+        <tr><td><code>DisableACDMode(iID: Word)</code></td><td><code>RQ_CTI_DISABLEACDMODE</code></td><td>grupo</td></tr>
+        <tr><td><code>SetACDTime(iID, iTime: Word)</code></td><td><code>RQ_CTI_SETCTITIME</code></td><td>grupo, tempo</td></tr>
+        <tr><td><code>SetACDNum(const sID, sNum: String)</code></td><td><code>RQ_CTI_SETACDNUM</code></td><td>grupo, número</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Consultas e listagens</h2>
+    <table>
+      <thead>
+        <tr><th>Método</th><th>Comando</th><th>Parâmetros enviados</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>QueryExtLogged(const sExtension: String)</code></td><td><code>RQ_CTI_QUERYEXTLOGGED</code></td><td>ramal</td></tr>
+        <tr><td><code>GetExtensionName(const sExtension: String)</code></td><td><code>RQ_CTI_GETEXTNAME</code></td><td>ramal</td></tr>
+        <tr><td><code>QueryListAgents()</code></td><td><code>RQ_CTI_QUERYLISTAGENTS</code></td><td>—</td></tr>
+        <tr><td><code>QueryListDevices()</code></td><td><code>RQ_CTI_QUERYLISTDEVICES</code></td><td>—</td></tr>
+        <tr><td><code>QueryListQueues()</code></td><td><code>RQ_CTI_QUERYLISTQUEUES</code></td><td>—</td></tr>
+        <tr><td><code>QueryListWork()</code></td><td><code>RQ_CTI_QUERYLISTWORK</code></td><td>— (motivos de pós-atendimento)</td></tr>
+        <tr><td><code>QueryListUnavail()</code></td><td><code>RQ_CTI_QUERYLISTUNAVAIL</code></td><td>— (motivos de pausa)</td></tr>
+        <tr><td><code>QueryEWT(const sCTName: String)</code></td><td><code>RQ_CTI_QUERYEWT</code></td><td>nome da fila/grupo (tempo estimado de espera)</td></tr>
+        <tr><td><code>QueryList(iDevType: Integer)</code></td><td><code>RQ_CTI_QUERYLIST</code></td><td>tipo de dispositivo</td></tr>
+        <tr><td><code>QueryExtensions()</code></td><td><code>RQ_CTI_QUERYEXTENSIONS</code></td><td>—</td></tr>
+        <tr><td><code>QuerySystemData(iType: Word)</code></td><td><code>RQ_CTI_QUERYSYSTEMDATA</code></td><td>tipo</td></tr>
+        <tr><td><code>QueryICDMembers(iID: Word)</code></td><td><code>RQ_CTI_QUERYICDMEMBERS</code></td><td>grupo</td></tr>
+        <tr><td><code>QueryTrkMembers(iID: Word)</code></td><td><code>RQ_CTI_QUERYTRKMEMBERS</code></td><td>grupo de troncos</td></tr>
+        <tr><td><code>QueryExtMembers(iID: Word)</code></td><td><code>RQ_CTI_QUERYEXTMEMBERS</code></td><td>grupo de ramais</td></tr>
+        <tr><td><code>QueryDevices(iType: Word)</code></td><td><code>RQ_CTI_QUERYDEVICES</code></td><td>tipo</td></tr>
+        <tr><td><code>SnapshotDiallable(const sNumber: String)</code></td><td><code>RQ_CTI_SNAPSHOT_DIALLABLE</code></td><td>número</td></tr>
+        <tr><td><code>SnapshotDevice(iDeviceID: LongWord)</code></td><td><code>RQ_CTI_SNAPSHOT_DEVICE</code></td><td>dispositivo</td></tr>
+        <tr><td><code>SnapshotGroup(iID: Word)</code></td><td><code>RQ_CTI_SNAPSHOT_GROUP</code></td><td>grupo</td></tr>
+        <tr><td><code>SnapshotTrunk(iID: Word)</code></td><td><code>RQ_CTI_SNAPSHOT_TRUNK</code></td><td>tronco</td></tr>
+        <tr><td><code>SnapshotPark(iID: Word)</code></td><td><code>RQ_CTI_SNAPSHOT_PARK</code></td><td>posição de estacionamento</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Eventos</h2>
+    <p>
+      Além dos eventos herdados, o componente decodifica cinco tipos de pacote do servidor. A coluna
+      <em>campo</em> indica a posição no pacote (veja o <a href="../protocolo.html">formato</a>). As assinaturas
+      foram deduzidas das chamadas em <code>VVCTIClient.pas</code>; os tipos estão em <code>VVHeadType</code>.
+    </p>
+
+    <h3>OnLinkUp / OnLinkDown</h3>
+    <p>Pacotes <code>EV_CTI_LINKUP</code> e <code>EV_CTI_LINKDOWN</code>: o link entre o servidor e o PABX subiu ou caiu.</p>
+    <table>
+      <thead><tr><th>Parâmetro</th><th>Tipo</th><th>Campo</th></tr></thead>
+      <tbody>
+        <tr><td><code>iCTIType</code></td><td><code>Integer</code></td><td>5</td></tr>
+        <tr><td><code>sCTIHost</code></td><td><code>String</code></td><td>6</td></tr>
+        <tr><td><code>iCTIPort</code></td><td><code>Integer</code></td><td>7</td></tr>
+      </tbody>
+    </table>
+
+    <h3>OnACDEvent</h3>
+    <p>Pacote <code>EV_CTI_ACDMONITOR</code>: mudança de estado ACD de um agente.</p>
+    <table>
+      <thead><tr><th>Parâmetro</th><th>Tipo</th><th>Campo</th></tr></thead>
+      <tbody>
+        <tr><td><code>iEventID</code></td><td><code>Integer</code></td><td>5</td></tr>
+        <tr><td><code>sAgentID</code></td><td><code>String</code></td><td>6</td></tr>
+        <tr><td><code>sExtension</code></td><td><code>String</code></td><td>7</td></tr>
+        <tr><td><code>iAgtStatus</code></td><td><code>Integer</code></td><td>8</td></tr>
+        <tr><td><code>iMediaType</code></td><td><code>Integer</code></td><td>9</td></tr>
+      </tbody>
+    </table>
+
+    <h3>OnAgentEvent</h3>
+    <p>Pacote <code>EV_CTI_AGENTMONITOR</code>.</p>
+    <table>
+      <thead><tr><th>Parâmetro</th><th>Tipo</th><th>Campo</th></tr></thead>
+      <tbody>
+        <tr><td><code>iEventID</code></td><td><code>Integer</code></td><td>5</td></tr>
+        <tr><td><code>sAgentID</code></td><td><code>String</code></td><td>6</td></tr>
+        <tr><td><code>sExtension</code></td><td><code>String</code></td><td>7</td></tr>
+        <tr><td><code>sStatus</code></td><td><code>String</code></td><td>8</td></tr>
+      </tbody>
+    </table>
+
+    <h3>OnLineEvent</h3>
+    <p>Pacote <code>EV_CTI_LINEMONITOR</code>: evento de chamada em um dispositivo monitorado. É por aqui que a aplicação conhece o <code>sCallID</code> usado nos métodos de controle de chamadas.</p>
+    <table>
+      <thead><tr><th>Parâmetro</th><th>Tipo</th><th>Campo</th><th>Conteúdo</th></tr></thead>
+      <tbody>
+        <tr><td><code>iEventID</code></td><td><code>Integer</code></td><td>5</td><td>Tipo do evento de linha</td></tr>
+        <tr><td><code>sOwner</code></td><td><code>String</code></td><td>6</td><td>Dispositivo dono do evento</td></tr>
+        <tr><td><code>sCallID</code></td><td><code>String</code></td><td>7</td><td>Identificador da chamada</td></tr>
+        <tr><td><code>sParty1</code> … <code>sParty4</code></td><td><code>String</code></td><td>8 a 11</td><td>Participantes</td></tr>
+        <tr><td><code>sANI</code></td><td><code>String</code></td><td>12</td><td>Número de origem</td></tr>
+        <tr><td><code>sDNIS</code></td><td><code>String</code></td><td>13</td><td>Número discado</td></tr>
+        <tr><td><code>sAttachData</code></td><td><code>String</code></td><td>14</td><td>Dados anexos à chamada</td></tr>
+        <tr><td><code>sQueueName</code></td><td><code>String</code></td><td>15</td><td>Fila</td></tr>
+        <tr><td><code>iConnState</code></td><td><code>Word</code></td><td>16</td><td>Estado da conexão</td></tr>
+        <tr><td><code>iEventCause</code></td><td><code>Word</code></td><td>17</td><td>Causa do evento</td></tr>
+        <tr><td><code>sNCID</code></td><td><code>String</code></td><td>18</td><td>Identificador de chamada de rede</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Os valores possíveis de <code>iEventID</code>, <code>iAgtStatus</code>, <code>iConnState</code> e
+      <code>iEventCause</code> são definidos pelo servidor CTI e não aparecem nestes fontes.
+    </p>
+  </body>
+</html>

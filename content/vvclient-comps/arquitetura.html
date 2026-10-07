@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Arquitetura e ciclo de vida</title>
+  </head>
+  <body>
+    <h1>Arquitetura e ciclo de vida</h1>
+
+    <p>
+      Toda a infraestrutura de rede vive em <a href="./componentes/tvvclient.html"><code>TVVClient</code></a>. Os
+      componentes derivados só acrescentam comandos (métodos que chamam <code>SendCommand</code>) e a
+      interpretação de eventos (sobrescrevendo <code>ProcessPacket</code>).
+    </p>
+
+    <h2>Dependências</h2>
+    <table>
+      <thead>
+        <tr><th>Unit</th><th>Papel</th><th>Na pasta?</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>OverbyteIcsWSocket</code>, <code>OverbyteIcsWndControl</code></td><td>Sockets TCP assíncronos (Overbyte ICS, <code>TWSocket</code>)</td><td>Biblioteca de terceiros</td></tr>
+        <tr><td><code>VVHeader</code></td><td>Constantes gerais: <code>cSep</code>, <code>cFin</code>, <code>cEmpty</code>, <code>cStrT</code>/<code>cStrF</code>, <code>cSIPPort</code>…</td><td>Não</td></tr>
+        <tr><td><code>VVHeadType</code></td><td>Tipos: <code>TVVSocketInfoRec</code>, tipos de evento (<code>TDebugInfo</code>, <code>TSocketEvent</code>, <code>TLineEvent</code>…), <code>TMonitorType</code>, <code>TVVCTIConnType</code></td><td>Não</td></tr>
+        <tr><td><code>VVLib</code></td><td>Utilitários: <code>GetParam</code>, <code>GetParamInt</code>, <code>StrZero</code>, <code>EncryptString</code>/<code>DecryptString</code>, <code>EncodeToProtocol</code>/<code>DecodeFromProtocol</code>, <code>MSecElapsed</code>…</td><td>Não</td></tr>
+        <tr><td><code>VVProtocol</code></td><td>Códigos de comando e resposta: <code>RP_ACK</code>, <code>RP_NAK</code>, <code>RETURN_OK</code>, <code>RQ_CTI_*</code>, <code>EV_CTI_*</code>, <code>RQ_SIP_*</code>, <code>EV_SIP_*</code></td><td>Não</td></tr>
+        <tr><td><code>VVChannelClient</code></td><td>Classe base de <code>TVVSIPClient</code></td><td>Não</td></tr>
+        <tr><td><code>VVCCTIMID_ConnectWare</code></td><td>Usada por <code>VVCTIClient.pas</code></td><td>Não</td></tr>
+        <tr><td><code>*.res</code></td><td>Recursos (ícones de paleta) de cada unit: <code>VVClient.res</code>, <code>VVCTIClient.res</code>, <code>VVRoutingClient.res</code>, <code>VVSIPClient.res</code></td><td>Não</td></tr>
+      </tbody>
+    </table>
+    <p>
+      <code>VVClient.pas</code> também usa <code>Forms</code> e <code>SvcMgr</code>, porque o modo síncrono precisa
+      de um <code>TApplication</code> ou de um <code>TServiceThread</code> para bombear mensagens.
+    </p>
+
+    <h2>Dois sockets</h2>
+    <table>
+      <thead>
+        <tr><th>Socket</th><th>Porta</th><th>Abre com</th><th>Uso</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Controle (<code>FIcsCSocket</code>)</td>
+          <td><code>SPort</code></td>
+          <td><code>Start</code> / <code>Stop</code></td>
+          <td>Requisições, respostas e eventos do protocolo. É o que define <code>Active</code>.</td>
+        </tr>
+        <tr>
+          <td>Debug (<code>FIcsDSocket</code>)</td>
+          <td><code>DPort</code> (por padrão <code>SPort + 1</code>)</td>
+          <td><code>StartDebug</code> / <code>StopDebug</code></td>
+          <td>Recebe texto de log do servidor, repassado em <code>OnServerDInfo</code>. Não envia nada e não reconecta sozinho.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Filtro do canal de debug</h3>
+    <p>
+      Com <code>FilterDebug</code> vazio, cada bloco recebido é entregue inteiro em <code>OnServerDInfo</code>.
+      Com um ou mais filtros, o bloco é quebrado em linhas e só são entregues as linhas que contêm (como
+      substring) pelo menos um dos filtros — uma chamada do evento por linha.
+    </p>
+
+    <h2>Temporizadores</h2>
+    <table>
+      <thead>
+        <tr><th>Timer</th><th>Componente</th><th>Intervalo</th><th>Ativo quando</th><th>O que faz</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Transação (<code>FTmTrans</code>)</td><td><code>TVVClient</code></td>
+          <td><code>TimeOut</code> (60 000 ms)</td>
+          <td>Há uma transação síncrona pendente</td>
+          <td>Encerra a transação, incrementa <code>TimeOutCount</code> e dispara <code>OnTransactionTimeOut</code>.</td>
+        </tr>
+        <tr>
+          <td>Reconexão (<code>FTmReconnect</code>)</td><td><code>TVVClient</code></td>
+          <td>15 000 ms</td>
+          <td>A conexão falhou ou caiu, com <code>AutoReconnect</code> ligado</td>
+          <td>Chama <code>Start</code> de novo.</td>
+        </tr>
+        <tr>
+          <td>Keep-alive (<code>FTmKeepAlive</code>)</td><td><code>TVVClient</code></td>
+          <td>20–40 s (sorteado uma vez, na criação)</td>
+          <td>Socket de controle conectado e <code>KeepAlive = True</code></td>
+          <td>Envia <code>SendRequest(0, '')</code> — comando 0 sem parâmetros.</td>
+        </tr>
+        <tr>
+          <td>Keep-alive de roteamento (<code>FTmKA</code>)</td><td><code>TVVRoutingClient</code></td>
+          <td>30–60 s (sorteado de novo a cada disparo)</td>
+          <td>Sempre, desde a criação</td>
+          <td>Envia <code>RQ_KEEP_ALIVE</code> (2201). Sem conexão, o envio simplesmente retorna <code>False</code>.</td>
+        </tr>
+        <tr>
+          <td>Registro (<code>FTmRegister</code>)</td><td><code>TVVRoutingClient</code></td>
+          <td>5 000 ms</td>
+          <td>O servidor respondeu <code>RP_NAK</code> ao registro e <code>AutoRegister = True</code></td>
+          <td>Chama <code>RegisterApp</code> de novo (uma tentativa por disparo).</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>O intervalo aleatório evita que vários clientes enviem keep-alive ao mesmo tempo.</p>
+
+    <h2>Conexão e reconexão</h2>
+    <ol>
+      <li><code>Start</code> configura host e porta e chama <code>Connect</code>. A conexão do ICS é assíncrona: <code>Start</code> devolve <code>True</code> se o socket ficou em <em>conectando</em> ou <em>conectado</em>.</li>
+      <li>Em modo síncrono, <code>Start</code> ainda espera o desfecho da conexão (até <code>TimeOut + 1000</code> ms).</li>
+      <li>Conectou: dispara <code>ProcessConnected</code> e <code>OnSocketConnect</code>, desliga o timer de reconexão e liga o keep-alive.</li>
+      <li>Falhou ao conectar: dispara <code>OnSocketError</code> e, se o cliente foi iniciado e <code>AutoReconnect</code> está ligado, arma a reconexão.</li>
+      <li>Conexão fechada: dispara <code>ProcessDisconnected</code> e <code>OnSocketDisconnect</code> (e <code>OnSocketError</code> se houve código de erro), desliga o keep-alive e arma a reconexão nas mesmas condições.</li>
+      <li><code>Stop</code> marca o cliente como parado, cancela a reconexão e fecha o socket. O destrutor chama <code>Stop</code> e <code>StopDebug</code>.</li>
+    </ol>
+
+    <h2>Recepção de dados</h2>
+    <p>
+      Os bytes recebidos se acumulam em um buffer interno. Enquanto houver um terminador <code>cFin</code> no
+      buffer, o trecho até ele é extraído como um pacote e validado. Pacotes válidos seguem para
+      <code>ProcessPacket</code> e depois para <code>OnPacketRecv</code>; pacotes inválidos disparam
+      <code>OnPacketLoss</code>. Detalhes em <a href="./protocolo.html">Protocolo de comunicação</a>.
+    </p>
+
+    <h2>Modo síncrono × assíncrono</h2>
+    <table>
+      <thead>
+        <tr><th></th><th>Assíncrono (<code>SyncMode = False</code>, padrão)</th><th>Síncrono (<code>SyncMode = True</code>)</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Retorno do método</td>
+          <td><code>True</code> = pacote entregue ao socket</td>
+          <td><code>True</code> = servidor respondeu <code>RP_ACK</code></td>
+        </tr>
+        <tr>
+          <td>Onde ler a resposta</td>
+          <td>Evento <code>OnServerResponse</code></td>
+          <td><code>Response</code>, <code>RetCode</code>, <code>RespData</code> logo após a chamada (o evento também dispara)</td>
+        </tr>
+        <tr>
+          <td>Timeout</td>
+          <td>Não há controle de timeout</td>
+          <td><code>TimeOut</code> ms → <code>OnTransactionTimeOut</code>, retorno <code>False</code></td>
+        </tr>
+        <tr>
+          <td>Concorrência</td>
+          <td>Várias requisições podem estar em voo</td>
+          <td>Uma transação por vez: chamar outro comando com <code>InTrans = True</code> devolve <code>False</code> sem enviar</td>
+        </tr>
+        <tr>
+          <td>Pré-requisito</td>
+          <td>Nenhum</td>
+          <td><code>SetSysApplication</code> ou <code>SetSysServiceThread</code> chamado antes</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Como a espera síncrona funciona</h3>
+    <p>
+      Enquanto aguarda, o componente roda um laço que chama <code>Application.ProcessMessages</code> (aplicação
+      VCL) ou <code>ServiceThread.ProcessRequests(False)</code> (serviço Windows) e dorme <code>RespWait</code>
+      milissegundos por volta (padrão 20). É esse bombeamento de mensagens que permite ao ICS entregar a resposta
+      na mesma thread. O laço termina quando a resposta chega, quando o timer de transação estoura ou, por
+      segurança, após <code>TimeOut + 1000</code> ms.
+    </p>
+    <div class="callout callout-warning">
+      <p>
+        Como as mensagens continuam sendo processadas durante a espera, a interface segue respondendo: cliques,
+        timers e eventos do próprio componente podem executar <em>dentro</em> de uma chamada síncrona. Um comando
+        disparado nesse intervalo falha (retorna <code>False</code>) porque já existe uma transação em andamento.
+      </p>
+    </div>
+
+    <h2>Pontos de extensão</h2>
+    <p>Um componente derivado normalmente sobrescreve:</p>
+    <table>
+      <thead>
+        <tr><th>Método virtual</th><th>Quando é chamado</th><th>Quem sobrescreve</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>ProcessPacket(Info, sPacket)</code></td><td>A cada pacote válido recebido</td><td>CTI, Routing, SIP (todos chamam <code>inherited</code> primeiro)</td></tr>
+        <tr><td><code>ProcessConnected(Info)</code></td><td>Socket de controle conectou</td><td>Routing (registro automático)</td></tr>
+        <tr><td><code>ProcessDisconnected(Info)</code></td><td>Socket de controle fechou</td><td>Routing (zera <code>IsRegistered</code>)</td></tr>
+        <tr><td><code>SendCommand(iCommand, sParams, sFiller)</code></td><td>Antes de empacotar um comando</td><td>SIP (prefixa o número do canal)</td></tr>
+      </tbody>
+    </table>
+  </body>
+</html>

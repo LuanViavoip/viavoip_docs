@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Pontos de atenção</title>
+  </head>
+  <body>
+    <h1>Pontos de atenção</h1>
+
+    <p>
+      Comportamentos que não são óbvios pela interface dos componentes, observados na leitura dos fontes. Nada
+      aqui foi verificado em execução: os componentes não puderam ser compilados sem as units de apoio.
+    </p>
+
+    <h2>O que esta documentação não cobre</h2>
+    <table>
+      <thead>
+        <tr><th>Item ausente</th><th>Consequência</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>VVHeader</code></td><td>Não se sabe quais caracteres são <code>cSep</code> e <code>cFin</code>, nem o valor de <code>cSIPPort</code>, <code>cStrT</code>/<code>cStrF</code>, <code>cNotFound</code> e das constantes usadas no cabeçalho <em>Replaces</em>.</td></tr>
+        <tr><td><code>VVHeadType</code></td><td>As assinaturas dos eventos de <code>TVVClient</code>, <code>TVVCTIClient</code> e <code>TVVSIPClient</code> foram deduzidas das chamadas. Os valores de <code>TMonitorType</code> e <code>TVVCTIConnType</code> são desconhecidos.</td></tr>
+        <tr><td><code>VVProtocol</code></td><td>Os valores numéricos de <code>RP_ACK</code>, <code>RP_NAK</code>, <code>RETURN_OK</code> e de todos os <code>RQ_CTI_*</code>, <code>EV_CTI_*</code>, <code>RQ_SIP_*</code>, <code>EV_SIP_*</code> são desconhecidos. Só os códigos de roteamento estão documentados com valor.</td></tr>
+        <tr><td><code>VVLib</code></td><td>O algoritmo de criptografia e a codificação <code>EncodeToProtocol</code>/<code>DecodeFromProtocol</code> não foram analisados.</td></tr>
+        <tr><td><code>VVChannelClient</code></td><td>Propriedades, métodos e eventos que <code>TVVSIPClient</code> herda de <code>TVVChannelClient</code> não estão documentados.</td></tr>
+        <tr><td>Servidores</td><td>O formato de <code>RespData</code> de cada comando, os códigos de retorno e os valores dos identificadores de evento dependem dos servidores.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>TVVClient</h2>
+    <table>
+      <thead>
+        <tr><th>Comportamento</th><th>Impacto</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>SyncMode := True</code> é ignorado sem <code>SetSysApplication</code>/<code>SetSysServiceThread</code>.</td>
+          <td>O componente fica em modo assíncrono sem avisar. Um <code>SyncMode = True</code> gravado no <code>.dfm</code> não tem efeito. Confira a propriedade depois de atribuí-la.</td>
+        </tr>
+        <tr>
+          <td>Em modo assíncrono não há timeout.</td>
+          <td><code>OnTransactionTimeOut</code>, <code>InTrans</code> e <code>TimeOutCount</code> só funcionam em modo síncrono. Uma requisição assíncrona sem resposta passa despercebida, a menos que a aplicação controle isso.</td>
+        </tr>
+        <tr>
+          <td>O retorno <code>True</code> significa coisas diferentes em cada modo.</td>
+          <td>Assíncrono: o pacote foi enviado. Síncrono: o servidor respondeu <code>RP_ACK</code>.</td>
+        </tr>
+        <tr>
+          <td>A espera síncrona processa mensagens da aplicação.</td>
+          <td>Eventos de interface e timers rodam dentro da chamada. Comandos emitidos nesse intervalo devolvem <code>False</code>. Evite iniciar ações do usuário enquanto <code>InTrans = True</code>.</td>
+        </tr>
+        <tr>
+          <td>O keep-alive usa o mesmo caminho dos comandos.</td>
+          <td>Em modo síncrono ele é uma transação: zera <code>Response</code>/<code>RetCode</code>/<code>RespData</code> e, se disparar entre o seu comando e a leitura do resultado, sobrescreve esses valores. Leia a resposta imediatamente após a chamada, antes de devolver o controle ao laço de mensagens.</td>
+        </tr>
+        <tr>
+          <td><code>Start</code> devolve <code>True</code> com o socket ainda conectando (modo assíncrono).</td>
+          <td>Não envie comandos logo após <code>Start</code>; espere <code>OnSocketConnect</code> ou teste <code>Active</code>.</td>
+        </tr>
+        <tr>
+          <td><code>TrySend</code> não repete o envio.</td>
+          <td>Os parâmetros <code>iMaxError</code> e <code>iWait</code> existem na assinatura, mas a implementação atual faz uma única tentativa.</td>
+        </tr>
+        <tr>
+          <td>Pacotes inválidos são descartados sem retransmissão.</td>
+          <td>Ligue <code>OnPacketLoss</code> para detectar perda. Em modo síncrono, a transação correspondente termina por timeout.</td>
+        </tr>
+        <tr>
+          <td>O separador de pacotes é procurado no fluxo bruto.</td>
+          <td>Se um parâmetro contiver <code>cFin</code> ou <code>cSep</code>, o pacote se quebra. Dados arbitrários precisam passar por <code>EncodeToProtocol</code>. Com <code>Encrypted</code>, a robustez depende de <code>EncryptString</code> nunca produzir esses caracteres.</td>
+        </tr>
+        <tr>
+          <td>O intervalo do keep-alive é sorteado uma vez, na criação.</td>
+          <td>Cada instância mantém o mesmo intervalo (entre 20 e 40 s) por toda a sua vida.</td>
+        </tr>
+        <tr>
+          <td>O socket de debug não tem reconexão nem eventos próprios.</td>
+          <td>Quedas só aparecem como mensagem em <code>OnDebugInfo</code>.</td>
+        </tr>
+        <tr>
+          <td>Exceções são engolidas.</td>
+          <td>Falhas viram retorno <code>False</code> e uma mensagem em <code>OnDebugInfo</code>; <code>WaitProcess</code> ignora exceções sem registrar nada.</td>
+        </tr>
+        <tr>
+          <td>Propriedades somente leitura estão em <code>published</code>.</td>
+          <td><code>Active</code>, <code>InTrans</code>, <code>TimeOutCount</code>, <code>Response</code>, <code>RetCode</code> e <code>RespData</code> aparecem no Object Inspector, mas não são editáveis nem gravadas no <code>.dfm</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>TVVCTIClient</h2>
+    <table>
+      <thead>
+        <tr><th>Comportamento</th><th>Impacto</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Em modo assíncrono, <code>CTIType</code> é gravado assim que <code>UseCTI</code> é enviado.</td>
+          <td>O valor pode refletir um tipo que o servidor depois recusou. Confirme pelo <code>OnServerResponse</code> ou por <code>OnLinkUp</code>.</td>
+        </tr>
+        <tr>
+          <td><code>CTIType = 7</code> muda os parâmetros de quatro comandos ACD.</td>
+          <td>Sem <code>SetDefExt</code>, o ramal vai vazio. Veja a referência de <a href="./componentes/tvvcticlient.html">TVVCTIClient</a>.</td>
+        </tr>
+        <tr>
+          <td><code>SetDefContext</code> envia um comando ao servidor.</td>
+          <td>Apesar do nome parecido com <code>SetDefExt</code> (que é só local), ele dispara <code>RQ_CTI_SETCONTEXT</code> e não informa se o envio funcionou. Chame-o só com a conexão ativa.</td>
+        </tr>
+        <tr>
+          <td><code>SetACDTime</code> envia <code>RQ_CTI_SETCTITIME</code>.</td>
+          <td>O nome do método e o do comando divergem (ACD × CTI); vale conferir com o servidor qual é a intenção.</td>
+        </tr>
+        <tr>
+          <td>A ordem dos parâmetros não é uniforme.</td>
+          <td><code>CallInfo</code> e <code>GenerateToneExt</code> recebem a chamada antes do ramal; os demais métodos <code>Call…</code> recebem o ramal primeiro.</td>
+        </tr>
+        <tr>
+          <td>Código sem uso.</td>
+          <td>O procedimento interno <code>ProcGenACDConnW</code> (ajuste de estado ACD inicial para ConnectWare) nunca é chamado; os campos <code>FInternal</code> e <code>FContext</code> são gravados e nunca lidos; uma consulta automática de ramal logado após evento ACD está comentada.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>TVVRoutingClient</h2>
+    <table>
+      <thead>
+        <tr><th>Comportamento</th><th>Impacto</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Dois keep-alives simultâneos.</td>
+          <td>O da base (comando 0) e o próprio (<code>RQ_KEEP_ALIVE</code>). O próprio não pode ser desligado por propriedade e roda mesmo sem conexão (o envio apenas falha).</td>
+        </tr>
+        <tr>
+          <td>Métodos falham em silêncio antes do registro.</td>
+          <td>Devolvem <code>False</code> sem mensagem de debug. Espere <code>OnRegistered</code>.</td>
+        </tr>
+        <tr>
+          <td><code>RegID</code> vazio impede o registro sem disparar evento.</td>
+          <td><code>RegisterApp</code> devolve <code>False</code> e nem <code>OnRegistering</code> nem <code>OnRegisterFailed</code> ocorrem; a nova tentativa automática só existe após um <code>RP_NAK</code>.</td>
+        </tr>
+        <tr>
+          <td>Registro sem resposta não é repetido.</td>
+          <td>Se o servidor não responder ao <code>RQ_REGISTER</code>, nada acontece até a próxima reconexão; a repetição a cada 5 s só vale para recusa explícita.</td>
+        </tr>
+        <tr>
+          <td><code>AppType</code> não é inicializado no construtor.</td>
+          <td>Vale <code>appSMA</code> por ser o primeiro valor do enumerado.</td>
+        </tr>
+        <tr>
+          <td><code>ProcessConnected</code> e <code>ProcessDisconnected</code> não chamam <code>inherited</code>.</td>
+          <td>As mensagens de debug correspondentes da base não aparecem para este componente.</td>
+        </tr>
+        <tr>
+          <td><code>RQ_SYS_UNAVAIL</code> vale 1025.</td>
+          <td>Está fora da faixa 22xx dos demais comandos — provavelmente um código compartilhado com outro protocolo.</td>
+        </tr>
+        <tr>
+          <td>Comentário de seção diz <code>TVVCCAgent</code>.</td>
+          <td>Resquício de outra classe; não afeta o comportamento.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>TVVSIPClient</h2>
+    <table>
+      <thead>
+        <tr><th>Comportamento</th><th>Impacto</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Depende do modo síncrono.</td>
+          <td><code>WaitRing</code>, <code>GetBuffer</code>, <code>GetDigits</code>, <code>HoldCall</code> e <code>RetrieveCall</code> leem a resposta logo após o envio.</td>
+        </tr>
+        <tr>
+          <td>A condição que identifica respostas é sempre verdadeira.</td>
+          <td>Em <code>ProcessPacket</code>, o teste <code>(iCommand &gt;= RP_ACK) or (iCommand &lt;= RP_NAK)</code> aceita praticamente qualquer código. O efeito prático é pequeno, porque o tratamento seguinte só reage a comandos específicos no campo 5, mas um evento não tratado cujo campo 5 coincida com um desses códigos seria interpretado como resposta.</td>
+        </tr>
+        <tr>
+          <td><code>ContactNum</code> e <code>PANINum</code> nunca são preenchidas.</td>
+          <td>Depois de <code>GetContactNumber</code>/<code>GetPANINumber</code>, leia o valor em <code>RespData</code>.</td>
+        </tr>
+        <tr>
+          <td><code>ConsultTransfer</code> encerra a segunda perna ao ser atendida.</td>
+          <td>É o comportamento padrão do código (<code>ForceDisconnect</code>). Para manter a consulta ativa, use <code>ConsultTransferND</code>.</td>
+        </tr>
+        <tr>
+          <td>Os indicadores de transferência só são reiniciados em alguns pontos.</td>
+          <td><code>ConsultTransfer</code>/<code>ConsultTransferND</code> ficam "armados" até que <code>IsDialoged</code>, <code>IsEstablished</code> ou <code>WaitRing</code> indiquem canal sem chamada. Enquanto isso, <code>MakeCall</code> e <code>ClearCall</code> não atualizam <code>CallID</code>, e o modo "sem desconexão" permanece ativo para consultas seguintes.</td>
+        </tr>
+        <tr>
+          <td><code>StartSATransfer</code> não confere se há chamada.</td>
+          <td>Sem <code>CallID</code>, a nova perna é criada, mas a conclusão da transferência não é enviada.</td>
+        </tr>
+        <tr>
+          <td><code>GetDigits</code> com timeout bloqueia a thread.</td>
+          <td>Usa <code>Sleep(200)</code> entre consultas e devolve sempre <code>True</code>. O tempo total pode chegar a <code>iNumDigits × iTimeOut</code>.</td>
+        </tr>
+        <tr>
+          <td><code>MakeCall</code> envia <code>TimeOut - 1000</code>.</td>
+          <td>Com <code>TimeOut</code> menor ou igual a 1000 ms, o servidor recebe zero ou um valor negativo.</td>
+        </tr>
+        <tr>
+          <td>A senha SIP trafega no comando <code>OpenChannel</code>.</td>
+          <td>Sem <code>Encrypted</code>, <code>UserPsw</code> vai em texto puro pelo socket de controle e aparece em <code>OnDebugInfo</code>/<code>OnPacketRecv</code> de quem registrar os pacotes.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Manutenção dos fontes</h2>
+    <ul>
+      <li><code>VVClient.pas</code> está em ISO-8859-1 (comentários acentuados); os outros três são ASCII puro. Abra-o com a codificação correta para não corromper os comentários.</li>
+      <li>Os cabeçalhos de <code>VVCTIClient.pas</code> (2015) e <code>VVSIPClient.pas</code> (2013) não refletem os ajustes feitos para a migração ao Overbyte ICS em 2025.</li>
+      <li>Qualquer mudança no formato do pacote em <code>TVVClient</code> precisa ser espelhada nos servidores: tamanho, separadores e envelope cifrado são validados dos dois lados.</li>
+    </ul>
+  </body>
+</html>

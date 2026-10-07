@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>TVVRoutingClient</title>
+  </head>
+  <body>
+    <h1>TVVRoutingClient</h1>
+
+    <p>
+      Cliente do servidor de roteamento: registra a aplicação, informa o estado dos agentes e coloca ou retira
+      chamadas das filas. Unit <code>VVRoutingClient.pas</code>, descendente de
+      <a href="./tvvclient.html"><code>TVVClient</code></a>, paleta <strong>ViaVOIP Tools</strong>, porta padrão
+      <strong>9220</strong> (debug 9221).
+    </p>
+    <p>
+      Diferente dos outros componentes, os códigos de comando e evento estão declarados na própria unit, então
+      este é o único protocolo totalmente visível nos fontes.
+    </p>
+
+    <h2>Registro da aplicação</h2>
+    <p>
+      O servidor só aceita comandos de uma aplicação registrada. <strong>Todos os métodos, exceto
+      <code>RegisterApp</code>, devolvem <code>False</code> sem enviar nada enquanto <code>IsRegistered</code> for
+      <code>False</code>.</strong>
+    </p>
+    <ol>
+      <li>Ao conectar, se <code>AutoRegister = True</code>, o componente chama <code>RegisterApp</code>.</li>
+      <li><code>RegisterApp</code> dispara <code>OnRegistering</code> e envia <code>RQ_REGISTER</code> com o tipo da aplicação e o <code>RegID</code>. Com <code>RegID</code> vazio, nada é enviado e o retorno é <code>False</code>.</li>
+      <li><code>RP_ACK</code>: <code>IsRegistered</code> passa a <code>True</code> e dispara <code>OnRegistered</code>.</li>
+      <li><code>RP_NAK</code>: dispara <code>OnRegisterFailed</code> e, com <code>AutoRegister</code>, tenta de novo em 5 s.</li>
+      <li>Ao desconectar, <code>IsRegistered</code> volta a <code>False</code>; a reconexão automática da base refaz o ciclo.</li>
+    </ol>
+
+    <h2>Propriedades</h2>
+    <table>
+      <thead>
+        <tr><th>Propriedade</th><th>Tipo</th><th>Padrão</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>AppType</code></td><td><code>TAppType</code></td><td><code>appSMA</code></td><td>Tipo da aplicação: <code>appSMA</code> (0), <code>appSMM</code> (1) ou <code>appCHN</code> (2). O ordinal é o que vai no registro.</td></tr>
+        <tr><td><code>RegID</code></td><td><code>String</code></td><td>vazio</td><td>Identificador de registro. Obrigatório; espaços nas pontas são removidos.</td></tr>
+        <tr><td><code>AutoRegister</code></td><td><code>Boolean</code></td><td><code>True</code></td><td>Registra ao conectar e repete após recusa.</td></tr>
+        <tr><td><code>IsRegistered</code></td><td><code>Boolean</code> (somente leitura)</td><td><code>False</code></td><td>O servidor confirmou o registro nesta conexão.</td></tr>
+      </tbody>
+    </table>
+    <p>O significado de negócio de <code>appSMA</code>, <code>appSMM</code> e <code>appCHN</code> não está descrito nos fontes.</p>
+
+    <h2>Métodos</h2>
+    <table>
+      <thead>
+        <tr><th>Método</th><th>Comando</th><th>Parâmetros enviados</th><th>Validação local</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>RegisterApp()</code></td><td><code>RQ_REGISTER</code> (2202)</td><td>tipo da aplicação, RegID</td><td><code>RegID</code> não vazio</td></tr>
+        <tr><td><code>AgentLogon(const sExtNum, sAgtID: String)</code></td><td><code>RQ_AGENT_LOGON</code> (2203)</td><td>ramal, agente</td><td>ramal e agente não vazios</td></tr>
+        <tr><td><code>AgentLogoff(const sExtNum: String)</code></td><td><code>RQ_AGENT_LOGOFF</code> (2204)</td><td>ramal</td><td>ramal não vazio</td></tr>
+        <tr><td><code>AgentAvail(const sExtNum: String)</code></td><td><code>RQ_AGENT_AVAIL</code> (2208)</td><td>ramal</td><td>ramal não vazio</td></tr>
+        <tr><td><code>AgentUnavail(const sExtNum: String)</code></td><td><code>RQ_AGENT_UNAVAIL</code> (2209)</td><td>ramal</td><td>ramal não vazio</td></tr>
+        <tr><td><code>AgentWork(const sExtNum: String)</code></td><td><code>RQ_AGENT_WORK</code> (2210)</td><td>ramal</td><td>ramal não vazio</td></tr>
+        <tr><td><code>SysUnavail(const sExtNum: String; iReason: Word)</code></td><td><code>RQ_SYS_UNAVAIL</code> (1025)</td><td>ramal, motivo</td><td>—</td></tr>
+        <tr><td><code>EnqueueCall(iQID: LongWord; const sOwner, sCID, sANI, sDNIS, sTrk: String)</code></td><td><code>RQ_ENQUEUE_CALL</code> (2205)</td><td>fila, dono, chamada, ANI, DNIS, tronco</td><td>—</td></tr>
+        <tr><td><code>DequeueCall(iQID: LongWord; const sCID: String; iEvtID: Word; const sExtNum, sSID: String)</code></td><td><code>RQ_DEQUEUE_CALL</code> (2206)</td><td>fila, chamada, evento, ramal, SID</td><td>—</td></tr>
+        <tr><td><code>HasAvail(iQID: LongWord)</code></td><td><code>RQ_HAS_AVAIL</code> (2211)</td><td>fila</td><td>—</td></tr>
+        <tr><td><code>QueryAgentQueues(const sAgtID: String)</code></td><td><code>RQ_QRY_AGT_QUEUES</code> (2207)</td><td>agente</td><td>—</td></tr>
+        <tr><td><code>GetExtOrdered()</code></td><td><code>RQ_GET_EXT_ORDERED</code> (2212)</td><td>—</td><td>—</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Todos devolvem <code>Boolean</code>. As respostas de consulta (<code>HasAvail</code>,
+      <code>QueryAgentQueues</code>, <code>GetExtOrdered</code>) chegam em <code>RespData</code> /
+      <code>OnServerResponse</code>; seu formato é definido pelo servidor.
+    </p>
+
+    <h2>Eventos</h2>
+    <table>
+      <thead>
+        <tr><th>Evento</th><th>Tipo</th><th>Origem</th><th>Parâmetros (campo do pacote)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>OnRegistering</code></td><td><code>TNotifyEvent</code></td><td>Local, antes de enviar o registro</td><td>—</td></tr>
+        <tr><td><code>OnRegistered</code></td><td><code>TNotifyEvent</code></td><td><code>RP_ACK</code> de <code>RQ_REGISTER</code></td><td>—</td></tr>
+        <tr><td><code>OnRegisterFailed</code></td><td><code>TNotifyEvent</code></td><td><code>RP_NAK</code> de <code>RQ_REGISTER</code></td><td>—</td></tr>
+        <tr><td><code>OnAgentReserved</code></td><td><code>TAgtResEvt</code></td><td><code>EV_AGENT_RESERVED</code> (7701)</td><td><code>sExtNum</code> (5), <code>sAgtID</code> (6)</td></tr>
+        <tr><td><code>OnAgentReleased</code></td><td><code>TAgtResEvt</code></td><td><code>EV_AGENT_RELEASED</code> (7702)</td><td><code>sExtNum</code> (5), <code>sAgtID</code> (6)</td></tr>
+        <tr><td><code>OnEnqueueCall</code></td><td><code>TEnqueueCallEvt</code></td><td><code>EV_ENQUEUE_CALL</code> (7703)</td><td><code>iQueueID</code> (5), <code>sCID</code> (7), <code>sA</code> (8), <code>sB</code> (9), <code>sTrk</code> (10)</td></tr>
+        <tr><td><code>OnDequeueCall</code></td><td><code>TDequeueCallEvt</code></td><td><code>EV_DEQUEUE_CALL</code> (7704)</td><td><code>iQueueID</code> (5), <code>sCID</code> (6), <code>iEvtID</code> (7), <code>sExtNum</code> (8)</td></tr>
+        <tr><td><code>OnChangeAgtQueues</code></td><td><code>TChangeAgtQueues</code></td><td><code>EV_CHANGE_AGT_QUEUES</code> (7705)</td><td><code>sQueues</code> (5)</td></tr>
+        <tr><td><code>OnQueueUpdate</code></td><td><code>TQueueUpdate</code></td><td><code>EV_QUEUE_UPDATE</code> (7706)</td><td><code>iQueueID</code> (5), <code>sCID</code> (6), <code>sANI</code> (7), <code>sAgtID</code> (8)</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Em <code>EV_ENQUEUE_CALL</code> o campo 6 é ignorado pelo componente. Pela ordem dos parâmetros de
+      <code>EnqueueCall</code> (fila, dono, chamada…), é provável que seja o dono da chamada — inferência, não
+      confirmada nos fontes.
+    </p>
+
+    <h3>Tipos de evento</h3>
+    <pre><code class="language-pascal">TAppType = (appSMA, appSMM, appCHN);
+
+TAgtResEvt = procedure(Sender: TObject;
+  const sExtNum, sAgtID: String) of object;
+
+TEnqueueCallEvt = procedure(Sender: TObject;
+  iQueueID: LongWord; const sCID, sA, sB, sTrk: String) of object;
+
+TDequeueCallEvt = procedure(Sender: TObject; iQueueID: LongWord;
+  const sCID: String; iEvtID: Word; const sExtNum: String) of object;
+
+TChangeAgtQueues = procedure(Sender: TObject;
+  const sQueues: String) of object;
+
+TQueueUpdate = procedure(Sender: TObject; iQueueID: LongWord;
+  const sCID, sANI, sAgtID: String) of object;</code></pre>
+
+    <h2>Tabela de códigos</h2>
+    <table>
+      <thead>
+        <tr><th>Constante</th><th>Valor</th><th>Direção</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>RQ_SYS_UNAVAIL</code></td><td>1025</td><td>cliente → servidor</td></tr>
+        <tr><td><code>RQ_KEEP_ALIVE</code></td><td>2201</td><td>cliente → servidor</td></tr>
+        <tr><td><code>RQ_REGISTER</code></td><td>2202</td><td>cliente → servidor</td></tr>
+        <tr><td><code>RQ_AGENT_LOGON</code></td><td>2203</td><td>cliente → servidor</td></tr>
+        <tr><td><code>RQ_AGENT_LOGOFF</code></td><td>2204</td><td>cliente → servidor</td></tr>
+        <tr><td><code>RQ_ENQUEUE_CALL</code></td><td>2205</td><td>cliente → servidor</td></tr>
+        <tr><td><code>RQ_DEQUEUE_CALL</code></td><td>2206</td><td>cliente → servidor</td></tr>
+        <tr><td><code>RQ_QRY_AGT_QUEUES</code></td><td>2207</td><td>cliente → servidor</td></tr>
+        <tr><td><code>RQ_AGENT_AVAIL</code></td><td>2208</td><td>cliente → servidor</td></tr>
+        <tr><td><code>RQ_AGENT_UNAVAIL</code></td><td>2209</td><td>cliente → servidor</td></tr>
+        <tr><td><code>RQ_AGENT_WORK</code></td><td>2210</td><td>cliente → servidor</td></tr>
+        <tr><td><code>RQ_HAS_AVAIL</code></td><td>2211</td><td>cliente → servidor</td></tr>
+        <tr><td><code>RQ_GET_EXT_ORDERED</code></td><td>2212</td><td>cliente → servidor</td></tr>
+        <tr><td><code>EV_AGENT_RESERVED</code></td><td>7701</td><td>servidor → cliente</td></tr>
+        <tr><td><code>EV_AGENT_RELEASED</code></td><td>7702</td><td>servidor → cliente</td></tr>
+        <tr><td><code>EV_ENQUEUE_CALL</code></td><td>7703</td><td>servidor → cliente</td></tr>
+        <tr><td><code>EV_DEQUEUE_CALL</code></td><td>7704</td><td>servidor → cliente</td></tr>
+        <tr><td><code>EV_CHANGE_AGT_QUEUES</code></td><td>7705</td><td>servidor → cliente</td></tr>
+        <tr><td><code>EV_QUEUE_UPDATE</code></td><td>7706</td><td>servidor → cliente</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Keep-alive próprio</h2>
+    <p>
+      O componente envia <code>RQ_KEEP_ALIVE</code> a cada 30–60 s (o intervalo é sorteado de novo a cada envio).
+      Esse timer fica ligado desde a criação do componente, independentemente da propriedade
+      <code>KeepAlive</code> da base, que controla um segundo keep-alive (comando 0). Para ter apenas o de
+      roteamento, defina <code>KeepAlive := False</code>.
+    </p>
+  </body>
+</html>

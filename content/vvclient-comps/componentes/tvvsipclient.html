@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>TVVSIPClient</title>
+  </head>
+  <body>
+    <h1>TVVSIPClient</h1>
+
+    <p>
+      Controla um canal SIP no servidor de canais: registro do ramal, chamadas, transferências, reprodução e
+      gravação de áudio e coleta de DTMF. Unit <code>VVSIPClient.pas</code>, descendente de
+      <code>TVVChannelClient</code> (unit <code>VVChannelClient</code>, não incluída na pasta), paleta
+      <strong>ViaVOIP Clients</strong>, porta padrão <strong>7050</strong> (debug 7051).
+    </p>
+
+    <div class="callout callout-warning">
+      <p>
+        Este componente foi escrito para o <strong>modo síncrono</strong>. Vários métodos leem
+        <code>RespData</code> ou <code>CallID</code> logo depois de enviar um comando (<code>WaitRing</code>,
+        <code>GetBuffer</code>, <code>GetDigits</code>, <code>HoldCall</code>, <code>RetrieveCall</code>), o que
+        só funciona quando a resposta já chegou. Em modo assíncrono esses valores estarão vazios ou desatualizados.
+      </p>
+    </div>
+
+    <h2>Um componente, um canal</h2>
+    <p>
+      Cada instância representa um canal, identificado por <code>ChnNumber</code>. O componente guarda o estado da
+      chamada corrente em <code>CallID</code> e o envia automaticamente:
+    </p>
+    <table>
+      <thead>
+        <tr><th>Tipo de comando</th><th>Parâmetros prefixados</th><th>Se <code>CallID</code> estiver vazio</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Comando de canal (<code>SendCommand</code>)</td><td>número do canal</td><td>Envia normalmente</td></tr>
+        <tr><td>Comando de chamada (<code>SendCallIDCommand</code>)</td><td>número do canal, <code>CallID</code></td><td>Zera a última resposta e devolve <code>False</code> sem enviar</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Propriedades</h2>
+    <table>
+      <thead>
+        <tr><th>Propriedade</th><th>Tipo</th><th>Padrão</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>ChnNumber</code></td><td><code>Integer</code></td><td>0</td><td>Número do canal no servidor; vai em todo comando.</td></tr>
+        <tr><td><code>TransportIP</code></td><td><code>String</code></td><td>vazio</td><td>Endereço de transporte SIP.</td></tr>
+        <tr><td><code>TransportPort</code></td><td><code>Integer</code></td><td><code>cSIPPort</code></td><td>Porta de transporte SIP (constante de <code>VVHeader</code>).</td></tr>
+        <tr><td><code>UserAgent</code></td><td><code>String</code></td><td>vazio</td><td>Usuário SIP (ramal) do canal.</td></tr>
+        <tr><td><code>Domain</code></td><td><code>String</code></td><td>vazio</td><td>Domínio SIP. Também usado para montar o destino da transferência assistida.</td></tr>
+        <tr><td><code>UserPsw</code></td><td><code>String</code></td><td>vazio</td><td>Senha do usuário SIP. É enviada em <code>OpenChannel</code>; ative <code>Encrypted</code> se a rede não for confiável.</td></tr>
+        <tr><td><code>Retry</code></td><td><code>Integer</code></td><td>3000</td><td>Valor de repetição enviado ao originar chamadas.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Estado da chamada (somente leitura)</h3>
+    <table>
+      <thead>
+        <tr><th>Propriedade</th><th>Tipo</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>CallID</code></td><td><code>String</code></td><td>Chamada corrente do canal. Vazio = canal livre.</td></tr>
+        <tr><td><code>CallIDB</code></td><td><code>String</code></td><td>Segunda perna, criada por <code>ConsultTransfer</code>.</td></tr>
+        <tr><td><code>ANI</code></td><td><code>String</code></td><td>Número de origem da chamada corrente.</td></tr>
+        <tr><td><code>DNIS</code></td><td><code>String</code></td><td>Número discado da chamada corrente.</td></tr>
+        <tr><td><code>Inbound</code></td><td><code>Boolean</code></td><td>A chamada corrente é de entrada.</td></tr>
+        <tr><td><code>ContactNum</code>, <code>PANINum</code></td><td><code>String</code></td><td>Declaradas, mas nunca preenchidas nesta unit (veja <a href="../pontos-de-atencao.html">Pontos de atenção</a>).</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Como o estado é atualizado</h3>
+    <table>
+      <thead>
+        <tr><th>Resposta a</th><th>Condição</th><th>Efeito</th></tr>
+      </thead>
+      <tbody>
+        <tr><td rowspan="2"><code>IsDialoged</code>, <code>IsEstablished</code></td><td><code>RespData</code> verdadeiro</td><td><code>CallID</code>, <code>ANI</code> e <code>DNIS</code> vêm dos campos 8, 9 e 10 do pacote.</td></tr>
+        <tr><td>caso contrário</td><td>Limpa <code>CallID</code>, <code>ANI</code>, <code>DNIS</code> e os indicadores de transferência.</td></tr>
+        <tr><td rowspan="2"><code>WaitRing</code></td><td><code>RetCode = RETURN_OK</code></td><td><code>CallID</code>, <code>ANI</code>, <code>DNIS</code> e <code>Inbound</code> vêm dos valores 1 a 4 de <code>RespData</code>.</td></tr>
+        <tr><td>caso contrário</td><td>Limpa tudo, inclusive <code>CallIDB</code>.</td></tr>
+        <tr><td><code>MakeCall</code></td><td><code>RETURN_OK</code> e sem transferência em curso</td><td><code>CallID</code>, <code>ANI</code>, <code>DNIS</code> e <code>Inbound</code> vêm de <code>RespData</code>.</td></tr>
+        <tr><td><code>ClearCall</code></td><td><code>RETURN_OK</code> e sem transferência em curso</td><td><code>CallID</code> recebe o valor 1 de <code>RespData</code>.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Métodos</h2>
+    <p>Todos devolvem <code>Boolean</code>. A coluna <em>Tipo</em> indica se o comando é de canal ou de chamada (exige <code>CallID</code>).</p>
+
+    <h3>Canal</h3>
+    <table>
+      <thead>
+        <tr><th>Método</th><th>Comando</th><th>Tipo</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>OpenChannel()</code></td><td><code>RQ_SIP_OPENCHANNEL</code></td><td>canal</td><td>Abre o canal enviando <code>TransportIP</code>, <code>TransportPort</code>, <code>UserAgent</code>, <code>Domain</code> e <code>UserPsw</code>.</td></tr>
+        <tr><td><code>CloseChannel()</code></td><td><code>RQ_SIP_CLOSECHANNEL</code></td><td>canal</td><td>Fecha o canal (<code>UserAgent</code>, <code>Domain</code>).</td></tr>
+        <tr><td><code>IsRegistered()</code></td><td><code>RQ_SIP_ISREGISTERED</code></td><td>canal</td><td>Consulta se o ramal está registrado.</td></tr>
+        <tr><td><code>IsDialoged()</code></td><td><code>RQ_SIP_ISDIALOGED</code></td><td>canal</td><td>Consulta se há diálogo SIP no canal; atualiza o estado da chamada.</td></tr>
+        <tr><td><code>IsEstablished()</code></td><td><code>RQ_SIP_ISESTABLISHED</code></td><td>canal</td><td>Consulta se há chamada estabelecida; atualiza o estado da chamada.</td></tr>
+        <tr><td><code>IsHolded()</code></td><td><code>RQ_SIP_ISHOLDED</code></td><td>canal</td><td>Consulta se a chamada está em espera.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      Nos métodos <code>Is…</code>, o retorno indica apenas que o comando foi aceito; a resposta lógica está em
+      <code>RespData</code> (verdadeiro = <code>cStrT</code>, falso = <code>cStrF</code>).
+    </p>
+
+    <h3>Chamadas</h3>
+    <table>
+      <thead>
+        <tr><th>Método</th><th>Comando</th><th>Tipo</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>WaitRing(iTimeOut: Integer)</code></td><td><code>RQ_SIP_WAITRING</code></td><td>canal</td><td>Primeiro chama <code>IsEstablished</code>; se já houver chamada, devolve <code>True</code> com resposta <code>RP_ACK</code>/<code>RETURN_OK</code> sem esperar. Senão, pede ao servidor que aguarde uma chamada por <code>iTimeOut</code> ms.</td></tr>
+        <tr><td><code>MakeCall(const sDestination: String)</code></td><td><code>RQ_SIP_MAKECALL</code></td><td>canal</td><td>Origina uma chamada. Recusa se já houver <code>CallID</code>. Envia destino, <code>Retry</code> e <code>TimeOut - 1000</code>.</td></tr>
+        <tr><td><code>ClearCall()</code></td><td><code>RQ_SIP_CLEARCALL</code></td><td>chamada</td><td>Encerra a chamada corrente.</td></tr>
+        <tr><td><code>ClearCallID(const sCallID: String)</code></td><td><code>RQ_SIP_CLEARID</code></td><td>sem resposta</td><td>Encerra uma chamada específica do canal. Exige que exista uma chamada corrente.</td></tr>
+        <tr><td><code>HoldCall()</code></td><td><code>RQ_SIP_HOLDCALL</code></td><td>chamada</td><td>Coloca em espera. Em modo síncrono, consulta <code>IsHolded</code> antes e não envia se já estiver em espera.</td></tr>
+        <tr><td><code>RetrieveCall()</code></td><td><code>RQ_SIP_RETRIEVECALL</code></td><td>chamada</td><td>Recupera da espera. Em modo síncrono, não envia se a chamada não estiver em espera.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Transferências</h3>
+    <table>
+      <thead>
+        <tr><th>Método</th><th>Comando</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>BlindTransfer(const sDestination: String)</code></td><td><code>RQ_SIP_BLINDTRANSFER</code></td><td>Transferência cega da chamada corrente.</td></tr>
+        <tr><td><code>StartSATransfer(const sDestination: String)</code></td><td><code>RQ_SIP_MAKECALL</code> + <code>RQ_SIP_SATRANSFER</code></td><td>Transferência assistida: liga para o destino e, quando a nova perna toca ou é atendida, transfere a chamada original para ela.</td></tr>
+        <tr><td><code>ConsultTransfer(const sDestination: String)</code></td><td><code>RQ_SIP_MAKECALL</code></td><td>Abre uma segunda perna (<code>CallIDB</code>) para o destino, mantendo a chamada corrente. Exige <code>CallID</code>. Quando a segunda perna é estabelecida, o componente a encerra automaticamente.</td></tr>
+        <tr><td><code>ConsultTransferND(const sDestination: String)</code></td><td><code>RQ_SIP_MAKECALL</code></td><td>Igual a <code>ConsultTransfer</code>, mas <strong>sem</strong> encerrar a segunda perna quando ela é estabelecida (ND = <em>no disconnect</em>).</td></tr>
+        <tr><td><code>ClearConsult()</code></td><td><code>RQ_SIP_CLEARID</code></td><td>Encerra a segunda perna (<code>CallIDB</code>).</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Sequência da transferência assistida</h4>
+    <ol>
+      <li><code>StartSATransfer('2050')</code> guarda o destino e envia <code>RQ_SIP_MAKECALL</code>.</li>
+      <li>O servidor emite <code>EV_SIP_RINGOUT</code> (ou <code>EV_SIP_ESTABLISHED</code>) com o Call-ID SIP, o <em>from-tag</em> e o <em>to-tag</em> da nova perna (campos 5, 6 e 7).</li>
+      <li>O componente monta o destino <code>2050@Domain</code> seguido do cabeçalho <em>Replaces</em> com o Call-ID (com <code>@</code> trocado por <code>%40</code>), o to-tag e o from-tag.</li>
+      <li>Envia <code>RQ_SIP_SATRANSFER</code> para a chamada corrente, sem aguardar resposta.</li>
+    </ol>
+    <p>A transferência é concluída no primeiro dos dois eventos que chegar — na prática, quando o destino começa a tocar.</p>
+
+    <h3>Áudio</h3>
+    <table>
+      <thead>
+        <tr><th>Método</th><th>Comando</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>PlayFiles(const sFiles: String)</code></td><td><code>RQ_SIP_PLAYFILES</code></td><td>Reproduz um ou mais arquivos na chamada.</td></tr>
+        <tr><td><code>PlayFilesAsync(const sFiles: String)</code></td><td><code>RQ_SIP_PLAYFILESASYNC</code></td><td>Inicia a reprodução sem esperar o término.</td></tr>
+        <tr><td><code>StopPlay()</code></td><td><code>RQ_SIP_STOPPLAY</code></td><td>Interrompe a reprodução.</td></tr>
+        <tr><td><code>BackFile(iSecs: Word)</code></td><td><code>RQ_SIP_BACKFILE</code></td><td>Retrocede a reprodução em <code>iSecs</code> segundos. Sem resposta.</td></tr>
+        <tr><td><code>StepFile(iSecs: Word)</code></td><td><code>RQ_SIP_STEPFILE</code></td><td>Avança a reprodução em <code>iSecs</code> segundos. Sem resposta.</td></tr>
+        <tr><td><code>SetLoopMessage(bLoop: Boolean)</code></td><td><code>RQ_SIP_SETLOOPMESSAGE</code></td><td>Liga ou desliga a repetição da mensagem.</td></tr>
+        <tr><td><code>IsPlaying()</code></td><td><code>RQ_SIP_ISPLAYING</code></td><td>Consulta se há reprodução em andamento.</td></tr>
+        <tr><td><code>StartRec(const sFile: String)</code></td><td><code>RQ_SIP_STARTREC</code></td><td>Inicia a gravação da chamada.</td></tr>
+        <tr><td><code>StopRec()</code></td><td><code>RQ_SIP_STOPREC</code></td><td>Para a gravação.</td></tr>
+        <tr><td><code>SaveRec(const sFile: String)</code></td><td><code>RQ_SIP_SAVEREC</code></td><td>Salva a gravação no arquivo indicado.</td></tr>
+        <tr><td><code>FlushRec()</code></td><td><code>RQ_SIP_FLUSHREC</code></td><td>Descarta o conteúdo gravado.</td></tr>
+        <tr><td><code>IsRecording()</code></td><td><code>RQ_SIP_ISRECORDING</code></td><td>Consulta se há gravação em andamento.</td></tr>
+      </tbody>
+    </table>
+    <p>
+      O formato de <code>sFiles</code> (separador entre arquivos, caminhos aceitos) e o local onde os arquivos
+      ficam são definidos pelo servidor de canais.
+    </p>
+
+    <h3>DTMF</h3>
+    <table>
+      <thead>
+        <tr><th>Método</th><th>Comando</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>GetDigits(iNumDigits, iTimeOut: Integer; var sDigits: String)</code></td><td><code>RQ_SIP_GETDIGITS</code></td><td>Lê dígitos recebidos. Veja os dois modos abaixo.</td></tr>
+        <tr><td><code>ClearDigits()</code></td><td><code>RQ_SIP_CLEARDIGITS</code></td><td>Descarta os dígitos pendentes.</td></tr>
+        <tr><td><code>GetBuffer(iNumDigits: Integer; var sBuffer: String)</code></td><td><code>RQ_SIP_GETBUFFER</code></td><td>Lê até <code>iNumDigits</code> do buffer de DTMF; devolve <code>RespData</code> em <code>sBuffer</code>.</td></tr>
+        <tr><td><code>ClearBuffer()</code></td><td><code>RQ_SIP_CLEARBUFFER</code></td><td>Limpa o buffer de DTMF.</td></tr>
+        <tr><td><code>SetFlushOnDTMF(bFlush: Boolean)</code></td><td><code>RQ_SIP_SETFLUSHONDTMF</code></td><td>Define se um DTMF interrompe a reprodução.</td></tr>
+        <tr><td><code>SetMaskAccept(const sMask: String)</code></td><td><code>RQ_SIP_SETMASKACCEPT</code></td><td>Define os dígitos aceitos.</td></tr>
+        <tr><td><code>SetMaskTerminate(const sMask: String)</code></td><td><code>RQ_SIP_SETMASKTERMINATE</code></td><td>Define os dígitos terminadores.</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Os dois modos de GetDigits</h4>
+    <table>
+      <thead>
+        <tr><th><code>iTimeOut</code></th><th>Comportamento</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>0</td><td>Uma única consulta pedindo <code>iNumDigits</code>; devolve o que o servidor tiver naquele momento.</td></tr>
+        <tr><td>maior que 0</td><td>Coleta um dígito por vez, consultando o servidor a cada 200 ms. <code>iTimeOut</code> é o tempo máximo de espera <strong>por dígito</strong>. Termina quando completa <code>iNumDigits</code> ou quando um dígito não chega a tempo, sempre devolvendo <code>True</code>; confira o comprimento de <code>sDigits</code>.</td></tr>
+      </tbody>
+    </table>
+    <p>No segundo modo a thread chamadora fica bloqueada entre as consultas (<code>Sleep(200)</code>).</p>
+
+    <h3>Informações da chamada</h3>
+    <table>
+      <thead>
+        <tr><th>Método</th><th>Comando</th><th>Descrição</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>GetContactNumber()</code></td><td><code>RQ_SIP_GETCONTACTNUM</code></td><td>Pede o número do cabeçalho <em>Contact</em>. O resultado vem em <code>RespData</code>.</td></tr>
+        <tr><td><code>GetPANINumber()</code></td><td><code>RQ_SIP_GETPANINUM</code></td><td>Pede o número do cabeçalho <em>P-Asserted-Identity</em>. O resultado vem em <code>RespData</code>.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Eventos</h2>
+    <p>Além dos herdados de <a href="./tvvclient.html">TVVClient</a> (e de <code>TVVChannelClient</code>, não analisado):</p>
+    <table>
+      <thead>
+        <tr><th>Evento</th><th>Tipo</th><th>Pacote</th><th>Parâmetros (campo)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>OnDTMFBuffer</code></td><td><code>TDTMFReceived</code></td><td><code>EV_SIP_BUFFERDIGITS</code></td><td>dígitos (5)</td></tr>
+        <tr><td><code>OnFreqReport</code></td><td><code>TDTMFReceived</code></td><td><code>EV_SIP_FREQREPORT</code></td><td>relatório de frequência (5)</td></tr>
+        <tr><td><code>OnRingOutEvt</code></td><td><code>TRingOutSIP</code></td><td><code>EV_SIP_RINGOUT</code></td><td>Call-ID (5), from-tag (6), to-tag (7)</td></tr>
+      </tbody>
+    </table>
+    <p>
+      <code>EV_SIP_ESTABLISHED</code> não tem evento próprio nesta unit; é usado internamente para concluir as
+      transferências e continua disponível em <code>OnPacketRecv</code>.
+    </p>
+
+    <h2>Comandos sem resposta</h2>
+    <p>
+      <code>BackFile</code>, <code>StepFile</code>, <code>ClearCallID</code>, <code>ClearConsult</code> e a
+      conclusão da transferência assistida são enviados direto ao socket, fora do mecanismo de transação. O
+      retorno indica só que o pacote saiu; eles não alteram <code>Response</code>/<code>RespData</code> e podem
+      ser usados enquanto outra transação está em andamento.
+    </p>
+  </body>
+</html>
