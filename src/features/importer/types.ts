@@ -11,7 +11,7 @@ export type ImportNode = {
   title: string;
   slug: string;
   type: string | null;
-  /** Caminho do HTML dentro do envio (ex.: "api/clientes.html"); `null` para nós estruturais. */
+  /** Caminho do HTML ou PDF dentro do envio (ex.: "api/clientes.html"); `null` para nós estruturais. */
   file: string | null;
   /** Referência a HTML já disponível, sem exigir o envio do arquivo. */
   contentUrl?: string | null;
@@ -39,6 +39,7 @@ export type ImportPreview = {
   tree: ImportNode[];
   documentCount: number;
   htmlCount: number;
+  pdfCount: number;
   imageCount: number;
   warnings: string[];
   errors: string[];

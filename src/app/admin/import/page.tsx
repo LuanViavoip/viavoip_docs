@@ -30,7 +30,7 @@ export default async function ImportPage() {
         <div className="mb-8 space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">Importar documentação</h1>
           <p className="text-sm text-muted-foreground">
-            Envie a documentação que está no seu computador (uma pasta ou um arquivo .zip com os HTMLs e imagens).
+            Envie a documentação que está no seu computador (uma pasta ou um arquivo .zip com os HTMLs, PDFs e imagens).
             Antes de gravar, você verá uma prévia da árvore que será criada.
           </p>
         </div>
@@ -41,10 +41,10 @@ export default async function ImportPage() {
           <summary className="cursor-pointer font-medium">Como a estrutura é montada</summary>
           <div className="mt-3 space-y-3 text-muted-foreground">
             <p>
-              <strong className="text-foreground">Sem índice:</strong> cada pasta vira uma seção e cada HTML vira um
-              documento. O <code>index.html</code> de uma pasta é o conteúdo da própria seção. O título vem do{" "}
+              <strong className="text-foreground">Sem índice:</strong> cada pasta vira uma seção e cada HTML ou PDF vira
+              um documento. O <code>index.html</code> de uma pasta é o conteúdo da própria seção. O título vem do{" "}
               <code>&lt;title&gt;</code> ou do primeiro <code>&lt;h1&gt;</code>. Prefixos numéricos (
-              <code>01-introducao.html</code>) definem a ordem.
+              <code>01-introducao.html</code>) definem a ordem. PDFs usam o nome do arquivo como título.
             </p>
             <p>
               <strong className="text-foreground">Com índice:</strong> se a raiz tiver um <code>{INDEX_FILE_NAME}</code>,

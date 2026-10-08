@@ -7,8 +7,8 @@ import type { UploadedFiles } from "./upload";
 
 export type StructureContext = {
   files: UploadedFiles;
-  /** Caminhos dos HTMLs válidos do envio. */
-  htmlPaths: Set<string>;
+  /** Caminhos dos HTMLs e PDFs válidos do envio. */
+  pagePaths: Set<string>;
   titleOf: (htmlPath: string) => string | null;
   /** Arquivos de exemplo lidos a partir do índice. */
   exampleFiles: Set<string>;
@@ -30,8 +30,8 @@ function nodeFromIndex(document: DocsIndexDocument, trail: number[], context: St
 
   if (document.file) {
     file = normalizeUploadPath(document.file);
-    if (!file || !context.htmlPaths.has(file)) {
-      context.errors.push(`Índice, ${label}: arquivo HTML "${document.file}" não encontrado no envio.`);
+    if (!file || !context.pagePaths.has(file)) {
+      context.errors.push(`Índice, ${label}: arquivo "${document.file}" não encontrado no envio (HTML ou PDF).`);
       file = null;
     }
   }
@@ -90,13 +90,13 @@ type FolderEntry = { folders: Map<string, FolderEntry>; pages: string[] };
 const INDEX_PAGE = /^index\.html?$/i;
 
 /**
- * Cada pasta vira um nó e cada HTML vira um documento. O `index.html` de uma pasta vira o conteúdo
+ * Cada pasta vira um nó e cada HTML ou PDF vira um documento. O `index.html` de uma pasta vira o conteúdo
  * do próprio nó da pasta. Prefixos numéricos ("01-intro.html") definem a ordem e são removidos.
  */
 export function treeFromFolders(context: StructureContext): ImportNode[] {
   const root: FolderEntry = { folders: new Map(), pages: [] };
 
-  for (const htmlPath of context.htmlPaths) {
+  for (const htmlPath of context.pagePaths) {
     const segments = htmlPath.split("/");
     let current = root;
     for (const folder of segments.slice(0, -1)) {

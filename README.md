@@ -15,6 +15,8 @@ componentes, integrações e exemplos de código.
 - A importação é feita em `/admin/import`, com autenticação administrativa: a pessoa envia, do próprio computador, uma **pasta**, um **.zip** ou um **índice JSON provisório** com os HTMLs e imagens; vê uma prévia da árvore e confirma. Detalhes em
   [src/features/importer/README.md](src/features/importer/README.md).
 - O HTML é lido **no servidor**, **sanitizado** e então renderizado na área central.
+- Um documento também pode ser um **PDF**: ele é exibido no visualizador do navegador, com link de download, e o seu
+  texto é extraído na importação para alimentar a pesquisa.
 - O texto extraído do HTML sanitizado fica em `Document.searchableContent` e alimenta a pesquisa
   (no futuro, PostgreSQL Full Text Search).
 - O usuário escolhe um **perfil** (Desenvolvedor, Suporte, ...) que filtra a árvore e a pesquisa.
@@ -34,6 +36,7 @@ Detalhes em [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Validação | Zod |
 | HTML | `sanitize-html` (sanitização e extração de texto) |
 | Importação | `fflate` (leitura de .zip) |
+| PDF | `unpdf` (extração de texto no servidor) |
 | Código | Shiki (realce de sintaxe no servidor) |
 
 ## Requisitos

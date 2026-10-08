@@ -71,7 +71,11 @@ export async function prepareImportAction(formData: FormData): Promise<PrepareIm
       const data = plan.storedFiles.get(file);
       if (!data) throw new Error("HTML referenciado não encontrado.");
       return new TextDecoder("utf8").decode(data);
-    }, `/content/${system.slug}/preview/`);
+    }, `/content/${system.slug}/preview/`, async file => {
+      const data = plan.storedFiles.get(file);
+      if (!data) throw new Error("PDF referenciado não encontrado.");
+      return data;
+    });
   } catch (error) {
     return { status: "invalid", errors: [error instanceof Error ? error.message : "Conteúdo inválido."] };
   }
@@ -95,6 +99,7 @@ export async function prepareImportAction(formData: FormData): Promise<PrepareIm
       tree,
       documentCount: plan.documentCount,
       htmlCount: plan.htmlCount,
+      pdfCount: plan.pdfCount,
       imageCount: plan.imageCount,
       warnings: plan.warnings,
       errors: [],

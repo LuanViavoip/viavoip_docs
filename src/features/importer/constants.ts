@@ -11,6 +11,7 @@ export const MAX_EXTRACTED_BYTES = 200 * 1024 * 1024;
 export const MAX_FILES = 3000;
 export const MAX_HTML_BYTES = 2 * 1024 * 1024;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+export const MAX_PDF_BYTES = 25 * 1024 * 1024;
 export const MAX_EXAMPLE_BYTES = 200 * 1024;
 export const MAX_INDEX_BYTES = 2 * 1024 * 1024;
 
@@ -18,6 +19,10 @@ export const MAX_INDEX_BYTES = 2 * 1024 * 1024;
 export const STAGING_TTL_MS = 60 * 60 * 1000;
 
 export const HTML_EXTENSIONS = new Set([".html", ".htm"]);
+export const PDF_EXTENSION = ".pdf";
+export const PDF_CONTENT_TYPE = "application/pdf";
+/** Arquivos que podem ser o conteúdo de um documento da árvore. */
+export const PAGE_FILE_PATTERN = /\.(?:html?|pdf)$/i;
 
 export const IMAGE_CONTENT_TYPES: Record<string, string> = {
   ".png": "image/png",

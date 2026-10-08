@@ -275,7 +275,7 @@ function ImportPreviewPanel({ preview, errors, isPending, onConfirm, onCancel }:
           </Badge>
         </div>
         <p className="mt-2 text-sm text-muted-foreground">
-          {preview.documentCount} documento(s) · {preview.htmlCount} HTML(s) · {preview.imageCount} imagem(ns) ·
+          {preview.documentCount} documento(s) · {preview.htmlCount} HTML(s) · {preview.pdfCount} PDF(s) · {preview.imageCount} imagem(ns) ·
           estrutura definida {preview.source === "index" ? "pelo docs-index.json" : "pelas pastas"}
         </p>
         <p className="mt-2 text-sm">Exemplos: {preview.exampleCount} · Perfis: {preview.profileSlugs.join(", ") || "globais"}</p>

@@ -1,7 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
-import path from "node:path";
-
-import { IMPORTED_CONTENT_PREFIX, resolveInside, SYSTEMS_STORAGE_DIR } from "@/lib/storage/paths";
+import { contentFileExtension, locateContentFile, readContentFile, statContentFile, type ContentFile } from "@/lib/storage/files";
 
 import { ContentError } from "./errors";
 import { parseContentUrl, type ContentLocation } from "./urls";
@@ -13,8 +10,8 @@ export type RawHtml = {
 };
 
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
+const MAX_PDF_BYTES = 25 * 1024 * 1024;
 const HTML_EXTENSIONS = new Set([".html", ".htm"]);
-const PUBLIC_DIR = path.join(process.cwd(), "public");
 
 /**
  * Ponto único de leitura de HTML bruto. Novas origens (servidor HTTP interno, storage, etc.)
@@ -45,38 +42,88 @@ async function loadFromLocation(location: ContentLocation, contentUrl: string): 
 }
 
 /**
- * Caminhos `/content/...` apontam para documentação importada (armazenada fora de `public/`);
- * os demais, para arquivos estáticos em `public/` (HTMLs de demonstração).
+ * Caminhos `/content/...` apontam para documentação importada e `/demo-docs/...` para os HTMLs de
+ * demonstração; ambos vêm do filesystem local ou, com `CONTENT_STORAGE=supabase`, do bucket privado.
  */
-function localFilePath(pathname: string): string | null {
-  if (pathname.startsWith(IMPORTED_CONTENT_PREFIX)) {
-    return resolveInside(SYSTEMS_STORAGE_DIR, pathname.slice(IMPORTED_CONTENT_PREFIX.length));
+const localFile = locateContentFile;
+
+/**
+ * Lê um PDF local (importado ou de `public/`). Usado para indexar o texto e para confirmar que o
+ * arquivo existe antes de exibir o visualizador.
+ */
+export async function loadRawPdf(contentUrl: string): Promise<Uint8Array> {
+  const location = parseContentUrl(contentUrl);
+  if (!location) {
+    throw new ContentError("invalid-url", `contentUrl inválido: "${contentUrl}"`);
   }
-  return resolveInside(PUBLIC_DIR, `.${pathname}`);
+  if (location.kind !== "local") {
+    throw new ContentError("unsupported-source", "Origens remotas ainda não estão habilitadas nesta fase.");
+  }
+  const file = await assertLocalPdf(location.pathname);
+  try {
+    return await readContentFile(file);
+  } catch {
+    throw new ContentError("read-failed", `Falha ao ler o PDF: ${location.pathname}`);
+  }
+}
+
+/** Confirma que o `contentUrl` aponta para um PDF local existente e dentro do limite de tamanho. */
+export async function assertPdfAvailable(contentUrl: string): Promise<void> {
+  const location = parseContentUrl(contentUrl);
+  if (!location) {
+    throw new ContentError("invalid-url", `contentUrl inválido: "${contentUrl}"`);
+  }
+  if (location.kind !== "local") {
+    throw new ContentError("unsupported-source", "Origens remotas ainda não estão habilitadas nesta fase.");
+  }
+  await assertLocalPdf(location.pathname);
+}
+
+async function assertLocalPdf(pathname: string): Promise<ContentFile> {
+  const file = localFile(pathname);
+  if (!file || contentFileExtension(file) !== ".pdf") {
+    throw new ContentError("invalid-url", "Caminho de PDF inválido.");
+  }
+  let info: { size: number } | null;
+  try {
+    info = await statContentFile(file);
+  } catch {
+    throw new ContentError("read-failed", `Falha ao consultar o PDF: ${pathname}`);
+  }
+  if (!info) {
+    throw new ContentError("not-found", `Arquivo PDF não encontrado: ${pathname}`);
+  }
+  if (info.size > MAX_PDF_BYTES) {
+    throw new ContentError("too-large", "Arquivo PDF excede o tamanho máximo permitido.");
+  }
+  return file;
 }
 
 async function readLocalHtml(pathname: string): Promise<string> {
-  const filePath = localFilePath(pathname);
+  const file = localFile(pathname);
 
-  if (!filePath) {
+  if (!file) {
     throw new ContentError("invalid-url", "Caminho fora dos diretórios de conteúdo.");
   }
-  if (!HTML_EXTENSIONS.has(path.extname(filePath).toLowerCase())) {
+  if (!HTML_EXTENSIONS.has(contentFileExtension(file))) {
     throw new ContentError("invalid-url", "Apenas arquivos .html são aceitos.");
   }
 
-  let size: number;
+  let info: { size: number } | null;
   try {
-    size = (await stat(filePath)).size;
+    info = await statContentFile(file);
   } catch {
+    throw new ContentError("read-failed", `Falha ao consultar o HTML: ${pathname}`);
+  }
+  if (!info) {
     throw new ContentError("not-found", `Arquivo HTML não encontrado: ${pathname}`);
   }
-  if (size > MAX_HTML_BYTES) {
+  if (info.size > MAX_HTML_BYTES) {
     throw new ContentError("too-large", "Arquivo HTML excede o tamanho máximo permitido.");
   }
 
   try {
-    return await readFile(filePath, "utf8");
+    return new TextDecoder("utf-8", { ignoreBOM: true }).decode(await readContentFile(file));
   } catch {
     throw new ContentError("read-failed", `Falha ao ler o HTML: ${pathname}`);
   }

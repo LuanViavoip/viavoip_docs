@@ -1,8 +1,9 @@
-import { FileWarningIcon, FolderOpenIcon } from "lucide-react";
+import { DownloadIcon, FileWarningIcon, FolderOpenIcon } from "lucide-react";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/layout/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { DocumentNode } from "@/features/documents/tree";
 import type { DocumentContentResult } from "@/features/content/service";
 
@@ -17,6 +18,8 @@ export function DocsContent({ node, content }: DocsContentProps) {
   switch (content.status) {
     case "ok":
       return <HtmlContent html={content.html} className="doc-content" />;
+    case "pdf":
+      return <PdfContent node={node} url={content.url} />;
     case "empty":
       return <SectionOverview node={node} />;
     case "error":
@@ -43,6 +46,24 @@ function DocumentTitle({ node }: { node: DocumentNode }) {
     <div className="flex flex-wrap items-center gap-3">
       <h1 className="text-3xl font-semibold tracking-tight">{node.title}</h1>
       {node.type ? <Badge variant="outline">{node.type}</Badge> : null}
+    </div>
+  );
+}
+
+/** Documentos em PDF usam o visualizador do navegador; o link de download cobre navegadores sem visualizador. */
+function PdfContent({ node, url }: { node: DocumentNode; url: string }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <DocumentTitle node={node} />
+        <Button asChild variant="outline" size="sm">
+          <a href={url} download>
+            <DownloadIcon aria-hidden />
+            Baixar PDF
+          </a>
+        </Button>
+      </div>
+      <iframe src={url} title={node.title} className="h-[80svh] w-full rounded-lg border bg-muted" />
     </div>
   );
 }

@@ -15,7 +15,13 @@ HTML local vem de `public/demo-docs/` ou de `STORAGE_DIR/systems/`, separado do 
 
 `script`, handlers `on*`, `javascript:`, SVG, iframe, object e embed são removidos pela sanitização. Tabelas, imagens, títulos, listas, código e formatação normal são preservados. A renderização exige `SafeHtml`; essa marca é garantia de tipos, e a proteção em runtime vem do sanitizador. O código realçado também produz SafeHtml a partir de texto escapado. Fixtures XSS vivem apenas nos testes; arquivos públicos de demonstração são seguros, pois podem ser acessados diretamente sem passar pelo sanitizador.
 
-A rota `/content/[...path]` entrega apenas imagens importadas, com `nosniff` e CSP `sandbox`. HTML importado não é servido cru. Caminhos normalizados e confinamento ao storage evitam traversal; storage deve ser controlado pela aplicação, sem symlinks criados por terceiros.
+### Documentos em PDF
+
+Um documento é PDF quando seu `contentUrl` termina em `.pdf` (não há coluna própria). `getDocumentContent()` confirma que o arquivo existe e retorna `{ status: "pdf", url }`; a interface exibe o arquivo no visualizador do navegador (`<iframe>`) com link de download. O PDF não passa pelo sanitizador de HTML: é entregue como `application/pdf` e interpretado apenas pelo visualizador. Links de HTML para um PDF que também é documento da árvore são reescritos para a rota interna, como entre HTMLs.
+
+Na importação, a assinatura `%PDF-` é verificada e o texto é extraído no servidor (`features/content/pdf.ts`, biblioteca `unpdf`) para `searchableContent`, com caracteres de controle removidos. PDF que não pode ser lido bloqueia a importação. PDFs digitalizados entram com texto vazio: aparecem na navegação, mas não na busca por conteúdo (não há OCR).
+
+A rota `/content/[...path]` entrega apenas imagens e PDFs importados, com `nosniff`. Imagens usam CSP `sandbox`; PDFs usam `frame-ancestors 'self'` (o `sandbox` impediria o visualizador) e aceitam requisições `Range`. HTML importado não é servido cru. Caminhos normalizados e confinamento ao storage evitam traversal; storage deve ser controlado pela aplicação, sem symlinks criados por terceiros.
 
 ## Administração
 
@@ -78,6 +84,7 @@ Documento sem perfis é global; com um ou vários perfis só aparece para perfis
 
 ```text
 HTML → sanitize → extract text → searchableContent → PostgreSQL
+PDF  → extract text (unpdf)    → searchableContent → PostgreSQL
 → correspondências em título/conteúdo/exemplos → ranking → limit
 ```
 

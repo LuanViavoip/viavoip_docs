@@ -2,10 +2,13 @@ import type { SafeHtml } from "@/lib/html/safe-html";
 
 import { ContentError, type ContentErrorReason } from "./errors";
 import { extractSearchableText, sanitizeDocumentHtml, type SanitizeOptions } from "./sanitize";
-import { loadRawHtml } from "./sources";
+import { extractPdfText, isPdfPath } from "./pdf";
+import { assertPdfAvailable, loadRawHtml, loadRawPdf } from "./sources";
 
 export type DocumentContentResult =
   | { status: "ok"; html: SafeHtml }
+  /** Documento em PDF: a interface exibe o arquivo em um visualizador, sem passar pela sanitização de HTML. */
+  | { status: "pdf"; url: string }
   | { status: "empty" }
   | { status: "error"; reason: ContentErrorReason; message: string };
 
@@ -24,6 +27,10 @@ export async function getDocumentContent({
   }
 
   try {
+    if (isPdfPath(contentUrl)) {
+      await assertPdfAvailable(contentUrl);
+      return { status: "pdf", url: contentUrl };
+    }
     const { html, baseUrl } = await loadRawHtml(contentUrl);
     const safe = sanitizeDocumentHtml(html, { baseUrl, resolveDocumentHref });
     const hasVisualContent = /<hr\b|<img\b[^>]*\bsrc="[^"]+"/i.test(safe);
@@ -37,10 +44,13 @@ export async function getDocumentContent({
 }
 
 /**
- * Fluxo de indexação: contentUrl -> HTML bruto -> sanitização -> texto puro.
+ * Fluxo de indexação: contentUrl -> HTML bruto -> sanitização -> texto puro (ou texto extraído do PDF).
  * Usado pelo seed para preencher `Document.searchableContent`; o importador reutiliza sanitização e extração.
  */
 export async function getDocumentSearchableText(contentUrl: string): Promise<string> {
+  if (isPdfPath(contentUrl)) {
+    return extractPdfText(await loadRawPdf(contentUrl));
+  }
   const { html, baseUrl } = await loadRawHtml(contentUrl);
   return extractSearchableText(sanitizeDocumentHtml(html, { baseUrl }));
 }

@@ -10,6 +10,7 @@ import { MAX_EXAMPLE_BYTES } from "./constants";
  *   "system": { "name": "Sol-Maker", "description": "..." },
  *   "documents": [
  *     { "title": "Introdução", "file": "index.html" },
+ *     { "title": "Manual", "file": "manuais/manual.pdf" },
  *     { "title": "APIs", "type": "module", "profiles": ["developer"], "children": [
  *       { "file": "api/clientes.html", "examples": [
  *         { "title": "Consultar", "language": "javascript", "file": "exemplos/consultar.js" }

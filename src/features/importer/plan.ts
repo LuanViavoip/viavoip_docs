@@ -6,7 +6,10 @@ import {
   MAX_IMAGE_BYTES,
   MAX_INDEX_BYTES,
   MAX_FILES,
+  MAX_PDF_BYTES,
+  PDF_EXTENSION,
 } from "./constants";
+import { hasPdfSignature } from "@/features/content/pdf";
 import { decodeHtml, extractHtmlTitle } from "./html";
 import { docsIndexSchema, type DocsIndex } from "./index-schema";
 import { extensionOf } from "./paths";
@@ -18,10 +21,11 @@ export type ImportPlan = {
   source: ImportStructureSource;
   tree: ImportNode[];
   indexSystem: DocsIndex["system"];
-  /** Arquivos que serão armazenados (HTMLs em UTF-8 e imagens). */
+  /** Arquivos que serão armazenados (HTMLs em UTF-8, PDFs e imagens). */
   storedFiles: Map<string, Uint8Array>;
   documentCount: number;
   htmlCount: number;
+  pdfCount: number;
   imageCount: number;
   warnings: string[];
   errors: string[];
@@ -39,6 +43,7 @@ export function buildImportPlan(files: UploadedFiles, knownProfiles: Set<string>
   }
   const storedFiles = new Map<string, Uint8Array>();
   const titles = new Map<string, string | null>();
+  const pdfPaths = new Set<string>();
   const otherFiles: string[] = [];
   let imageCount = 0;
 
@@ -54,6 +59,17 @@ export function buildImportPlan(files: UploadedFiles, knownProfiles: Set<string>
       if (utf8.byteLength > MAX_HTML_BYTES) { errors.push(`"${filePath}" excede o limite após conversão para UTF-8.`); continue; }
       titles.set(filePath, extractHtmlTitle(html));
       storedFiles.set(filePath, utf8);
+    } else if (extension === PDF_EXTENSION) {
+      if (data.byteLength > MAX_PDF_BYTES) {
+        errors.push(`"${filePath}" excede o limite de ${MAX_PDF_BYTES / 1024 / 1024} MB por PDF.`);
+        continue;
+      }
+      if (!hasPdfSignature(data)) {
+        errors.push(`"${filePath}" não é um PDF válido.`);
+        continue;
+      }
+      storedFiles.set(filePath, data);
+      pdfPaths.add(filePath);
     } else if (extension in IMAGE_CONTENT_TYPES) {
       if (data.byteLength > MAX_IMAGE_BYTES) {
         warnings.push(`Imagem "${filePath}" ignorada: excede ${MAX_IMAGE_BYTES / 1024 / 1024} MB.`);
@@ -67,14 +83,15 @@ export function buildImportPlan(files: UploadedFiles, knownProfiles: Set<string>
   }
 
   const htmlPaths = new Set(titles.keys());
-  if (htmlPaths.size === 0 && !files.has(INDEX_FILE_NAME)) {
-    errors.push("Nenhum arquivo HTML (.html/.htm) foi encontrado no envio.");
+  const pagePaths = new Set([...htmlPaths, ...pdfPaths]);
+  if (pagePaths.size === 0 && !files.has(INDEX_FILE_NAME)) {
+    errors.push("Nenhum arquivo HTML (.html/.htm) ou PDF foi encontrado no envio.");
   }
 
   const exampleFiles = new Set<string>();
   const context = {
     files,
-    htmlPaths,
+    pagePaths,
     titleOf: (p: string) => titles.get(p) ?? null,
     exampleFiles,
     errors,
@@ -88,10 +105,10 @@ export function buildImportPlan(files: UploadedFiles, knownProfiles: Set<string>
 
   if (source === "index") {
     const referenced = collectFiles(tree);
-    const unreferenced = [...htmlPaths].filter((htmlPath) => !referenced.has(htmlPath));
+    const unreferenced = [...pagePaths].filter((pagePath) => !referenced.has(pagePath));
     if (unreferenced.length > 0) {
       warnings.push(
-        `${unreferenced.length} HTML(s) não citados no índice não aparecerão na navegação: ${preview(unreferenced)}.`,
+        `${unreferenced.length} arquivo(s) HTML/PDF não citados no índice não aparecerão na navegação: ${preview(unreferenced)}.`,
       );
     }
   }
@@ -107,6 +124,7 @@ export function buildImportPlan(files: UploadedFiles, knownProfiles: Set<string>
     storedFiles,
     documentCount: countNodes(tree),
     htmlCount: htmlPaths.size,
+    pdfCount: pdfPaths.size,
     imageCount,
     warnings,
     errors,

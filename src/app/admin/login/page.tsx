@@ -1,10 +1,14 @@
+import { redirect } from "next/navigation";
+
 import { AppHeader } from "@/components/layout/app-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { loginAdminAction } from "@/features/admin/actions";
 import { getAdminConfig } from "@/features/admin/core";
+import { isAdminAuthDisabled } from "@/features/admin/session";
 
 export default async function AdminLoginPage({ searchParams }: PageProps<"/admin/login">) {
+  if (isAdminAuthDisabled()) redirect("/admin");
   const { error } = await searchParams;
   const configured = Boolean(getAdminConfig());
   return <div className="min-h-svh"><AppHeader /><main className="mx-auto max-w-sm space-y-6 px-4 py-16">
